@@ -31,13 +31,11 @@
 
 namespace mongo {
 
-// Permit users to use the decimal server support startup flag only if
-// they have built with the experimental decimal support option enabled
-#ifdef MONGO_CONFIG_EXPERIMENTAL_DECIMAL_SUPPORT
+// Permit users to use decimal support flags only if they have built with the option enabled
+#if ENABLE_EXPERIMENTAL_DECIMAL_SUPPORT == 1
 // Set up enableExperimentalDecimalSupport parameter only on startup
 MONGO_EXPORT_STARTUP_SERVER_PARAMETER(enableExperimentalDecimalSupport, bool, false);
 #else
-// Otherwise, declare the global knob boolean as false (decimal support is disabled)
 bool enableExperimentalDecimalSupport = false;
 #endif
 
