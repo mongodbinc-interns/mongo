@@ -457,6 +457,22 @@ tasks:
       resmoke_args: --suites=auth --storageEngine=wiredTiger
 
 - <<: *task_template
+  name: decimal
+  commands:
+  - func: "do setup"
+  - func: "run tests"
+  vars:
+    resmoke_args: --suites=decimal_server_disabled,decimal_server_enabled,decimal_shell_disabled --storageEngine=mmapv1
+
+- <<: *task_template
+  name: decimal_WT
+  commands:
+  - func: "do setup"
+  - func: "run tests"
+  vars:
+    resmoke_args: --suites=decimal_server_disabled,decimal_server_enabled,decimal_shell_disabled --storageEngine=wiredTiger
+
+- <<: *task_template
   name: dbtest
   commands:
   - func: "do setup"
@@ -1516,6 +1532,8 @@ buildvariants:
   - name: auth_WT
   - name: dbtest
   - name: dbtest_WT
+  - name: decimal
+  - name: decimal_WT
   - name: disk
   - name: durability
   - name: dur_jscore_passthrough
@@ -1614,6 +1632,8 @@ buildvariants:
   - name: auth_WT
   - name: dbtest
   - name: dbtest_WT
+  - name: decimal
+  - name: decimal_WT
   - name: disk
   - name: durability
   - name: failpoints
@@ -1689,6 +1709,7 @@ buildvariants:
   - name: aggregation_auth
   - name: auth
   - name: dbtest
+  - name: decimal
   - name: disk
   - name: durability
   - name: dur_jscore_passthrough
@@ -1740,6 +1761,7 @@ buildvariants:
   - name: aggregation_WT
   - name: auth_WT
   - name: dbtest_WT
+  - name: decimal_WT
   - name: gle_auth_WT
   - name: gle_auth_write_cmd_WT
   - name: gle_auth_basics_passthrough_WT
@@ -1792,6 +1814,8 @@ buildvariants:
   - name: auth_WT
   - name: dbtest
   - name: dbtest_WT
+  - name: decimal
+  - name: decimal_WT
   - name: disk
   - name: durability
   - name: dur_jscore_passthrough
@@ -1886,6 +1910,8 @@ buildvariants:
   - name: auth_WT
   - name: dbtest
   - name: dbtest_WT
+  - name: decimal
+  - name: decimal_WT
   - name: disk
   - name: durability
   - name: dur_jscore_passthrough
@@ -1982,6 +2008,8 @@ buildvariants:
   - name: auth_WT
   - name: dbtest
   - name: dbtest_WT
+  - name: decimal
+  - name: decimal_WT
   - name: failpoints_auth
   - name: jsCore_auth
   - name: mmap
@@ -2035,6 +2063,8 @@ buildvariants:
   - name: auth_WT
   - name: dbtest
   - name: dbtest_WT
+  - name: decimal
+  - name: decimal_WT
   - name: disk
   - name: durability
   - name: dur_jscore_passthrough
@@ -2126,6 +2156,7 @@ buildvariants:
   - name: aggregation
   - name: auth
   - name: dbtest
+  - name: decimal
   - name: disk
   - name: durability
   - name: failpoints
@@ -2208,6 +2239,8 @@ buildvariants:
   - name: auth_WT
   - name: dbtest
   - name: dbtest_WT
+  - name: decimal
+  - name: decimal_WT
   - name: disk
   - name: durability
   - name: failpoints
@@ -2295,6 +2328,8 @@ buildvariants:
   - name: auth_WT
   - name: dbtest
   - name: dbtest_WT
+  - name: decimal
+  - name: decimal_WT
   - name: disk
   - name: durability
   - name: failpoints
@@ -2369,6 +2404,8 @@ buildvariants:
   - name: auth_WT
   - name: dbtest
   - name: dbtest_WT
+  - name: decimal
+  - name: decimal_WT
   - name: disk
   - name: durability
   - name: failpoints
@@ -2436,6 +2473,8 @@ buildvariants:
   - name: audit_WT
   - name: dbtest
   - name: dbtest_WT
+  - name: decimal
+  - name: decimal_WT
   - name: jsCore_auth
   - name: mmap
   - name: replicasets_auth
@@ -2479,6 +2518,8 @@ buildvariants:
   - name: auth_WT
   - name: dbtest
   - name: dbtest_WT
+  - name: decimal
+  - name: decimal_WT
   - name: disk
   - name: durability
   - name: failpoints
@@ -2554,6 +2595,7 @@ buildvariants:
   - name: aggregation
   - name: auth
   - name: dbtest
+  - name: decimal
   - name: disk
   - name: durability
   - name: failpoints
@@ -2595,6 +2637,8 @@ buildvariants:
   - name: auth_WT
   - name: dbtest
   - name: dbtest_WT
+  - name: decimal
+  - name: decimal_WT
   - name: disk
   - name: durability
   - name: failpoints
@@ -2677,6 +2721,8 @@ buildvariants:
   - name: auth_WT
   - name: dbtest
   - name: dbtest_WT
+  - name: decimal
+  - name: decimal_WT
   - name: disk
   - name: durability
   - name: failpoints
@@ -2760,6 +2806,8 @@ buildvariants:
   - name: auth_WT
   - name: dbtest
   - name: dbtest_WT
+  - name: decimal
+  - name: decimal_WT
   - name: disk
   - name: durability
   - name: failpoints
@@ -2809,6 +2857,8 @@ buildvariants:
   - name: audit_WT
   - name: dbtest
   - name: dbtest_WT
+  - name: decimal
+  - name: decimal_WT
   - name: jsCore_auth
   - name: mmap
   - name: replicasets_auth
@@ -2848,6 +2898,8 @@ buildvariants:
   - name: audit_WT
   - name: dbtest
   - name: dbtest_WT
+  - name: decimal
+  - name: decimal_WT
   - name: mmap
   - name: jsCore_auth
   - name: replicasets_auth
@@ -2886,6 +2938,8 @@ buildvariants:
   - name: audit_WT
   - name: dbtest
   - name: dbtest_WT
+  - name: decimal
+  - name: decimal_WT
   - name: jsCore_auth
   - name: mmap
   - name: replicasets_auth
@@ -2928,6 +2982,8 @@ buildvariants:
   - name: auth_WT
   - name: dbtest
   - name: dbtest_WT
+  - name: decimal
+  - name: decimal_WT
   - name: disk
   - name: durability
   - name: dur_jscore_passthrough
@@ -3023,6 +3079,8 @@ buildvariants:
   - name: auth_WT
   - name: dbtest
   - name: dbtest_WT
+  - name: decimal
+  - name: decimal_WT
   - name: disk
   - name: durability
   - name: dur_jscore_passthrough
@@ -3118,6 +3176,8 @@ buildvariants:
   - name: auth_WT
   - name: dbtest
   - name: dbtest_WT
+  - name: decimal
+  - name: decimal_WT
   - name: disk
   - name: durability
   - name: dur_jscore_passthrough
@@ -3215,6 +3275,8 @@ buildvariants:
   - name: audit_WT
   - name: dbtest
   - name: dbtest_WT
+  - name: decimal
+  - name: decimal_WT
   - name: jsCore_auth
   - name: mmap
   - name: replicasets_auth
@@ -3253,6 +3315,8 @@ buildvariants:
   - name: audit_WT
   - name: dbtest
   - name: dbtest_WT
+  - name: decimal
+  - name: decimal_WT
   - name: jsCore_auth
   - name: mmap
   - name: replicasets_auth
@@ -3295,6 +3359,8 @@ buildvariants:
   - name: audit_WT
   - name: dbtest
   - name: dbtest_WT
+  - name: decimal
+  - name: decimal_WT
   - name: jsCore_auth
   - name: replicasets_auth
   - name: sasl
@@ -3335,6 +3401,8 @@ buildvariants:
   - name: auth_WT
   - name: dbtest
   - name: dbtest_WT
+  - name: decimal
+  - name: decimal_WT
   - name: disk
   - name: durability
   - name: dur_jscore_passthrough
@@ -3437,6 +3505,8 @@ buildvariants:
   - name: concurrency_sharded_WT
   - name: dbtest
   - name: dbtest_WT
+  - name: decimal
+  - name: decimal_WT
   - name: disk
   - name: durability
   - name: failpoints
@@ -3505,6 +3575,8 @@ buildvariants:
   - name: audit_WT
   - name: dbtest
   - name: dbtest_WT
+  - name: decimal
+  - name: decimal_WT
   - name: jsCore_auth
   - name: mmap
   - name: replicasets_auth
@@ -3545,6 +3617,8 @@ buildvariants:
   - name: auth_WT
   - name: dbtest
   - name: dbtest_WT
+  - name: decimal
+  - name: decimal_WT
   - name: disk
   - name: durability
   - name: dur_jscore_passthrough
@@ -3638,6 +3712,8 @@ buildvariants:
   - name: aggregation_auth
   - name: auth
   - name: dbtest
+  - name: decimal
+  - name: decimal_WT
   # - name: disk
   # - name: durability
   # - name: dur_jscore_passthrough
@@ -3699,6 +3775,8 @@ buildvariants:
   - name: auth_WT
   - name: dbtest
   - name: dbtest_WT
+  - name: decimal
+  - name: decimal_WT
   - name: disk
   - name: durability
   - name: failpoints
@@ -3789,6 +3867,8 @@ buildvariants:
   - name: auth_WT
   - name: dbtest
   - name: dbtest_WT
+  - name: decimal
+  - name: decimal_WT
   - name: disk
   - name: durability
   - name: dur_jscore_passthrough
