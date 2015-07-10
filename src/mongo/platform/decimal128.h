@@ -93,7 +93,6 @@ public:
          * Default to zero, copy constructor, from high and low parts.
          */
         Decimal128Value() = default;
-        Decimal128Value(const Decimal128Value& dval) = default;
         Decimal128Value(uint64_t low, uint64_t high);
     };
 
