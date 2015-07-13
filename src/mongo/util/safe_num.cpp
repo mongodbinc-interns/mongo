@@ -53,7 +53,7 @@ SafeNum::SafeNum(const BSONElement& element) {
             break;
         case NumberDecimal:
             _type = NumberDecimal;
-            _value.decimalVal = element.Decimal();
+            _value.decimalVal = element.Decimal().getValue();
             break;
         default:
             _type = EOO;
@@ -73,7 +73,7 @@ std::string SafeNum::debugString() const {
             os << "(NumberDouble)" << _value.doubleVal;
             break;
         case NumberDecimal:
-            os << "(NumberDecimal)" << _value.decimalVal.toString();
+            os << "(NumberDecimal)" << getDecimal(*this).toString();
             break;
         case EOO:
             os << "(EOO)";
@@ -150,7 +150,7 @@ bool SafeNum::isIdentical(const SafeNum& rhs) const {
         case NumberDouble:
             return _value.doubleVal == rhs._value.doubleVal;
         case NumberDecimal:
-            return _value.decimalVal.isEqual(rhs._value.decimalVal);
+            return Decimal128(_value.decimalVal).isEqual(rhs._value.decimalVal);
         case EOO:
         // EOO doesn't match anything, including itself.
         default:
@@ -178,7 +178,7 @@ double SafeNum::getDouble(const SafeNum& snum) {
         case NumberDouble:
             return snum._value.doubleVal;
         case NumberDecimal:
-            return snum._value.decimalVal.toDouble();
+            return Decimal128(snum._value.decimalVal).toDouble();
         default:
             return 0.0;
     }

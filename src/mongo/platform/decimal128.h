@@ -134,6 +134,7 @@ public:
      * Default initialize Decimal128's value struct to zero
      */
     Decimal128() = default;
+
     /**
      * This constructor takes in a raw decimal128 type, which consists of two
      * uint64_t's. This class performs an endian check on the system to ensure
