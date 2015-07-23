@@ -377,6 +377,11 @@ add_option('use-system-asio',
     nargs=0,
 )
 
+add_option('use-system-intel_decimal128',
+    help='use system version of intel decimal128',
+    nargs=0,
+)
+
 add_option('use-system-all',
     help='use all system libraries',
     nargs=0,
@@ -438,6 +443,13 @@ add_option('cache',
 add_option('cache-dir',
     default='$BUILD_ROOT/scons/cache',
     help='Specify the directory to use for caching objects if --cache is in use',
+)
+
+add_option("enable-experimental-decimal-support",
+    choices=['on', 'off'],
+    default='off',
+    help="Enable experimental decimal128 type support",
+    nargs=1,
 )
 
 def find_mongo_custom_variables():
@@ -1286,6 +1298,9 @@ if get_option('wiredtiger') == 'on':
     else:
         wiredtiger = True
 
+if get_option('enable-experimental-decimal-support') == 'on':
+    env.SetConfigHeaderDefine("MONGO_CONFIG_EXPERIMENTAL_DECIMAL_SUPPORT")
+
 if env['TARGET_ARCH'] == 'i386':
     # If we are using GCC or clang to target 32 bit, set the ISA minimum to 'nocona',
     # and the tuning to 'generic'. The choice of 'nocona' is selected because it
@@ -2035,6 +2050,9 @@ def doConfigure(myenv):
 
     if use_system_version_of_library("yaml"):
         conf.FindSysLibDep("yaml", ["yaml-cpp"])
+
+    if use_system_version_of_library("intel_decimal128"):
+        conf.FindSysLibDep("intel_decimal128", ["bid"])
 
     if wiredtiger and use_system_version_of_library("wiredtiger"):
         if not conf.CheckCXXHeader( "wiredtiger.h" ):
