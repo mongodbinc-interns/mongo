@@ -264,6 +264,7 @@ tasks:
 
           rm -rf ${install_directory|/data/mongo-install-directory}
           ${scons|scons} ${compile_flags|} --use-new-tools all dist dist-debugsymbols distsrc-${ext|tgz} ${msi_target|}
+          ${scons|scons} ${compile_flags|} --use-new-tools intel_tests
 
           ${python|python} buildscripts/generate_compile_expansions.py version.json | \
             tee compile_expansions.yml
@@ -289,6 +290,7 @@ tasks:
           - "./dbtest*"
           - "./mongobridge*"
           - "buildscripts/**"
+          - "build/third_party_tests/**"
           - "*Example"
           - "*Test"
           - "./**.pdb"
@@ -348,6 +350,28 @@ tasks:
           set -o errexit
           set -o verbose
           ${scons|scons} ${compile_flags|} lint
+
+## intel test ##
+- name: intel_library_test
+  depends_on:
+  - name: compile
+  commands:
+    - func: "do setup"
+    - command: shell.exec
+      params:
+        working_dir: src
+        script: |
+          set -o verbose
+          set -o errexit
+          set -o pipefail
+
+          ./build/third_party_tests/intel/readtest < build/third_party_tests/intel/readtest.in | tee tmp.out
+          if grep "FAILED" tmp.out; then
+            rm tmp.out
+            exit 1;
+          fi
+
+          rm tmp.out
 
 ## jstestfuzz ##
 - name: jstestfuzz
@@ -1625,6 +1649,7 @@ buildvariants:
   - name: compile
     distros:
     - rhel55
+  - name: intel_library_test
   - name: aggregation
   - name: aggregation_WT
   - name: aggregation_auth
@@ -1807,6 +1832,7 @@ buildvariants:
   - name: compile
     distros:
     - ubuntu1204-build
+  - name: intel_library_test
   - name: aggregation
   - name: aggregation_WT
   - name: aggregation_auth
@@ -1903,6 +1929,7 @@ buildvariants:
   - name: compile
     distros:
     - ubuntu1404-build
+  - name: intel_library_test
   - name: aggregation
   - name: aggregation_WT
   - name: aggregation_auth
@@ -2192,6 +2219,9 @@ buildvariants:
   - name: compile
     distros:
     - rhel55
+  - name: intel_library_test
+    distros:
+    - rhel55
   - name: aggregation
   - name: auth
   - name: dbtest
@@ -2233,6 +2263,7 @@ buildvariants:
   - name: compile
     distros:
     - windows-64-vs2013-compile
+  - name: intel_library_test
   - name: aggregation
   - name: aggregation_WT
   - name: auth
@@ -2322,6 +2353,7 @@ buildvariants:
   - name: compile
     distros:
     - windows-64-vs2013-compile
+  - name: intel_library_test
   - name: aggregation
   - name: aggregation_WT
   - name: auth
@@ -2398,6 +2430,7 @@ buildvariants:
   - name: compile
     distros:
     - windows-64-vs2013-compile
+  - name: intel_library_test
   - name: aggregation
   - name: aggregation_WT
   - name: auth
@@ -2590,6 +2623,9 @@ buildvariants:
     ext: zip
   tasks:
   - name: compile
+    distros:
+    - windows-64-vs2013-compile
+  - name: intel_library_test
     distros:
     - windows-64-vs2013-compile
   - name: aggregation
@@ -2799,6 +2835,7 @@ buildvariants:
     test_flags: --continueOnFailure
     compile_flags: --dbg=on --opt=on --allocator=system -j$(sysctl -n hw.logicalcpu) --osx-version-min=10.7 --libc++
   tasks:
+  - name: intel_library_test
   - name: compile
   - name: aggregation
   - name: aggregation_WT
@@ -2852,6 +2889,7 @@ buildvariants:
   - name: compile
     distros:
     - rhel55
+  - name: intel_library_test
   - name: lint
   - name: audit
   - name: audit_WT
@@ -3394,6 +3432,7 @@ buildvariants:
   - name: compile
     distros:
     - suse11-build
+  - name: intel_library_test
   - name: aggregation
   - name: aggregation_WT
   - name: aggregation_auth
@@ -3490,6 +3529,7 @@ buildvariants:
     num_jobs_unittests: $(kstat cpu | sort -u | grep -c "^module")
     test_flags: --continueOnFailure
   tasks:
+  - name: intel_library_test
   - name: compile
   - name: aggregation
   - name: aggregation_WT
@@ -3610,6 +3650,7 @@ buildvariants:
   - name: compile
     distros:
     - debian71-build
+  - name: intel_library_test
   - name: aggregation
   - name: aggregation_WT
   - name: aggregation_auth
