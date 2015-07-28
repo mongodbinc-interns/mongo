@@ -61,8 +61,8 @@ TEST(Basics, Initialization) {
 TEST(Basics, BSONElementInitialization) {
     mongo::BSONObj o;
     if (mongo::experimentalDecimalSupport) {
-        o = BSON("numberInt" << 1 << "numberLong" << 1LL << "numberDouble" << 0.1
-                                        << "NumberDecimal" << Decimal128("1"));
+        o = BSON("numberInt" << 1 << "numberLong" << 1LL << "numberDouble" << 0.1 << "NumberDecimal"
+                             << Decimal128("1"));
     } else {
         o = BSON("numberInt" << 1 << "numberLong" << 1LL << "numberDouble" << 0.1);
     }
@@ -103,7 +103,7 @@ TEST(Comparison, StrictTypeComparison) {
     ASSERT_FALSE(one.isIdentical(oneLong));
     ASSERT_FALSE(oneLong.isIdentical(oneDouble));
     ASSERT_FALSE(oneDouble.isIdentical(one));
-    
+
     if (mongo::experimentalDecimalSupport) {
         const SafeNum oneDecimal(Decimal128(1));
         ASSERT_FALSE(oneDecimal.isIdentical(one));
@@ -161,7 +161,7 @@ TEST(Addition, UpConvertion) {
     ASSERT_EQUALS(stillInt32.type(), mongo::NumberInt);
     ASSERT_EQUALS(stillInt64.type(), mongo::NumberLong);
     ASSERT_EQUALS(stillDouble.type(), mongo::NumberDouble);
-    
+
     if (mongo::experimentalDecimalSupport) {
         const SafeNum zeroDecimal(Decimal128(0));
         ASSERT_EQUALS((zeroInt64 + zeroDecimal).type(), mongo::NumberDecimal);
