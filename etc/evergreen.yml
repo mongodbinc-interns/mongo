@@ -2210,6 +2210,8 @@ buildvariants:
   - name: compile
     distros:
     - rhel55
+  - name: dbtest
+  - name: dbtest_WT
   - name: jsCore
   - name: jsDecimalCore
   - name: jsDecimalCore_WT
