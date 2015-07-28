@@ -63,18 +63,22 @@ const Seconds kConfigCommandTimeout{30};
 
 ShardRegistry::ShardRegistry(std::unique_ptr<RemoteCommandTargeterFactory> targeterFactory,
                              std::unique_ptr<executor::TaskExecutor> executor,
-                             executor::NetworkInterface* network,
-                             CatalogManager* catalogManager)
+                             executor::NetworkInterface* network)
     : _targeterFactory(std::move(targeterFactory)),
       _executor(std::move(executor)),
       _network(network),
-      _catalogManager(catalogManager) {
+      _catalogManager(nullptr) {}
+
+ShardRegistry::~ShardRegistry() = default;
+
+void ShardRegistry::init(CatalogManager* catalogManager) {
+    invariant(!_catalogManager);
+    _catalogManager = catalogManager;
+
     // add config shard registry entry so know it's always there
     stdx::lock_guard<stdx::mutex> lk(_mutex);
     _addConfigShard_inlock();
 }
-
-ShardRegistry::~ShardRegistry() = default;
 
 void ShardRegistry::startup() {
     _executor->startup();
@@ -310,10 +314,10 @@ StatusWith<std::vector<BSONObj>> ShardRegistry::exhaustiveFind(const HostAndPort
 StatusWith<BSONObj> ShardRegistry::runCommand(const HostAndPort& host,
                                               const std::string& dbName,
                                               const BSONObj& cmdObj) {
-    StatusWith<RemoteCommandResponse> responseStatus =
+    StatusWith<executor::RemoteCommandResponse> responseStatus =
         Status(ErrorCodes::InternalError, "Internal error running command");
 
-    RemoteCommandRequest request(host, dbName, cmdObj, kConfigCommandTimeout);
+    executor::RemoteCommandRequest request(host, dbName, cmdObj, kConfigCommandTimeout);
     auto callStatus =
         _executor->scheduleRemoteCommand(request,
                                          [&responseStatus](const RemoteCommandCallbackArgs& args) {

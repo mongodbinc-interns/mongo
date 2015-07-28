@@ -146,8 +146,6 @@ ntservice::NtServiceDefaultStrings defaultServiceStrings = {
 
 Timer startupSrandTimer;
 
-QueryResult::View emptyMoreResult(long long);
-
 class MyMessageHandler : public MessageHandler {
 public:
     virtual void connected(AbstractMessagingPort* p) {
@@ -733,7 +731,8 @@ static void startupConfigActions(const std::vector<std::string>& args) {
 #endif
 }
 
-MONGO_INITIALIZER_WITH_PREREQUISITES(CreateReplicationManager, ("SetGlobalEnvironment"))
+MONGO_INITIALIZER_WITH_PREREQUISITES(CreateReplicationManager,
+                                     ("SetGlobalEnvironment", "SSLManager"))
 (InitializerContext* context) {
     auto replCoord = stdx::make_unique<repl::ReplicationCoordinatorImpl>(
         getGlobalReplSettings(),

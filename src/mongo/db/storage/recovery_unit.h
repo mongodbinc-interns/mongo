@@ -53,9 +53,6 @@ public:
 
     virtual void reportState(BSONObjBuilder* b) const {}
 
-    virtual void beingReleasedFromOperationContext() {}
-    virtual void beingSetOnOperationContext() {}
-
     /**
      * These should be called through WriteUnitOfWork rather than directly.
      *
@@ -96,10 +93,10 @@ public:
      * change snapshots.
      *
      * If no snapshot has yet been marked as Majority Committed, returns a status with error
-     * code XXX_TEMP_NAME_ReadCommittedCurrentlyUnavailable. After this returns successfully,
-     * at any point where implementations attempt to acquire committed snapshot, if there are
-     * none available due to a call to SnapshotManager::dropAllSnapshots(), a UserException with
-     * the same code should be thrown.
+     * code ReadConcernNotAvailableYet. After this returns successfully, at any point where
+     * implementations attempt to acquire committed snapshot, if there are none available due to a
+     * call to SnapshotManager::dropAllSnapshots(), a UserException with the same code should be
+     * thrown.
      *
      * StorageEngines that don't support a SnapshotManager should use the default
      * implementation.
@@ -107,6 +104,13 @@ public:
     virtual Status setReadFromMajorityCommittedSnapshot() {
         return {ErrorCodes::CommandNotSupported,
                 "Current storage engine does not support $readMajorityTemporaryName"};
+    }
+
+    /**
+     * Returns true if setReadFromMajorityCommittedSnapshot() has been called.
+     */
+    virtual bool isReadingFromMajorityCommittedSnapshot() {
+        return false;
     }
 
     virtual SnapshotId getSnapshotId() const = 0;

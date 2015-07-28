@@ -34,28 +34,38 @@
 
 #include <utility>
 
+#include "mongo/config.h"
 #include "mongo/stdx/chrono.h"
 #include "mongo/stdx/memory.h"
 #include "mongo/util/log.h"
 #include "mongo/util/net/sock.h"
 
+#include "mongo/util/net/ssl_manager.h"
+
 namespace mongo {
 namespace executor {
 
 NetworkInterfaceASIO::NetworkInterfaceASIO()
-    : _io_service(),
-      _resolver(_io_service),
-      _state(State::kReady),
-      _isExecutorRunnable(false),
-      _numOps(0) {
+    : _io_service(), _resolver(_io_service), _state(State::kReady), _isExecutorRunnable(false) {
     _connPool = stdx::make_unique<ConnectionPool>(kMessagingPortKeepOpen);
+
+#ifdef MONGO_CONFIG_SSL
+    if (getSSLManager()) {
+        // We use sslv23, which corresponds to OpenSSLs SSLv23_method, for compatibility with older
+        // versions of OpenSSL. This mirrors the call to SSL_CTX_new in ssl_manager.cpp. In
+        // initAsyncSSLContext we explicitly disable all protocols other than TLSv1, TLSv1.1,
+        // and TLSv1.2.
+        _sslContext.emplace(asio::ssl::context::sslv23);
+        uassertStatusOK(
+            getSSLManager()->initSSLContext(_sslContext->native_handle(), getSSLGlobalParams()));
+    }
+#endif
 }
 
 std::string NetworkInterfaceASIO::getDiagnosticString() {
     str::stream output;
     output << "NetworkInterfaceASIO";
     output << " inShutdown: " << inShutdown();
-    output << " _numOps: " << _numOps.loadRelaxed();
     return output;
 }
 
@@ -99,6 +109,10 @@ void NetworkInterfaceASIO::waitForWorkUntil(Date_t when) {
     _isExecutorRunnable = false;
 }
 
+void NetworkInterfaceASIO::setConnectionHook(std::unique_ptr<ConnectionHook> hook) {
+    MONGO_UNREACHABLE;
+}
+
 void NetworkInterfaceASIO::signalWorkAvailable() {
     stdx::unique_lock<stdx::mutex> lk(_executorMutex);
     _signalWorkAvailable_inlock();
@@ -118,8 +132,7 @@ Date_t NetworkInterfaceASIO::now() {
 void NetworkInterfaceASIO::startCommand(const TaskExecutor::CallbackHandle& cbHandle,
                                         const RemoteCommandRequest& request,
                                         const RemoteCommandCompletionFn& onFinish) {
-    auto ownedOp =
-        stdx::make_unique<AsyncOp>(cbHandle, request, onFinish, now(), _numOps.fetchAndAdd(1));
+    auto ownedOp = stdx::make_unique<AsyncOp>(cbHandle, request, onFinish, now());
 
     AsyncOp* op = ownedOp.get();
 
@@ -128,7 +141,7 @@ void NetworkInterfaceASIO::startCommand(const TaskExecutor::CallbackHandle& cbHa
         _inProgress.emplace(op, std::move(ownedOp));
     }
 
-    asio::post(_io_service, [this, op]() { _asyncRunCommand(op); });
+    asio::post(_io_service, [this, op]() { _startCommand(op); });
 }
 
 void NetworkInterfaceASIO::cancelCommand(const TaskExecutor::CallbackHandle& cbHandle) {
@@ -140,6 +153,10 @@ void NetworkInterfaceASIO::cancelCommand(const TaskExecutor::CallbackHandle& cbH
         }
     }
 }
+
+void NetworkInterfaceASIO::setAlarm(Date_t when, const stdx::function<void()>& action) {
+    MONGO_UNREACHABLE;
+};
 
 bool NetworkInterfaceASIO::inShutdown() const {
     return (_state.load() == State::kShutdown);

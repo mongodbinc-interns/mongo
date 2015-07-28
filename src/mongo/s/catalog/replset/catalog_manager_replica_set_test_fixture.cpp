@@ -40,9 +40,9 @@
 #include "mongo/db/commands.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/query/lite_parsed_query.h"
-#include "mongo/db/repl/replication_executor.h"
 #include "mongo/db/service_context_noop.h"
 #include "mongo/executor/network_interface_mock.h"
+#include "mongo/executor/thread_pool_task_executor_test_fixture.h"
 #include "mongo/s/catalog/dist_lock_manager_mock.h"
 #include "mongo/s/catalog/replset/catalog_manager_replica_set.h"
 #include "mongo/s/catalog/type_changelog.h"
@@ -57,6 +57,8 @@ namespace mongo {
 
 using executor::NetworkInterfaceMock;
 using executor::NetworkTestEnv;
+using executor::RemoteCommandRequest;
+using executor::RemoteCommandResponse;
 using unittest::assertGet;
 
 using std::string;
@@ -81,10 +83,10 @@ void CatalogManagerReplSetTestFixture::setUp() {
     auto network(stdx::make_unique<executor::NetworkInterfaceMock>());
     _mockNetwork = network.get();
 
-    std::unique_ptr<repl::ReplicationExecutor> executor(
-        stdx::make_unique<repl::ReplicationExecutor>(network.release(), nullptr, 0));
+    auto executor = makeThreadPoolTestExecutor(std::move(network));
 
     _networkTestEnv = stdx::make_unique<NetworkTestEnv>(executor.get(), _mockNetwork);
+    _executor = executor.get();
 
     std::unique_ptr<CatalogManagerReplicaSet> cm(stdx::make_unique<CatalogManagerReplicaSet>());
 
@@ -98,7 +100,8 @@ void CatalogManagerReplSetTestFixture::setUp() {
     _targeterFactory->addTargeterToReturn(cm->connectionString(), std::move(configTargeter));
 
     auto shardRegistry(stdx::make_unique<ShardRegistry>(
-        std::move(targeterFactory), std::move(executor), _mockNetwork, cm.get()));
+        std::move(targeterFactory), std::move(executor), _mockNetwork));
+    shardRegistry->init(cm.get());
     shardRegistry->startup();
 
     // For now initialize the global grid object. All sharding objects will be accessible
@@ -114,6 +117,12 @@ void CatalogManagerReplSetTestFixture::tearDown() {
     _opCtx.reset();
     _client.reset();
     _service.reset();
+}
+
+void CatalogManagerReplSetTestFixture::shutdownExecutor() {
+    if (_executor) {
+        _executor->shutdown();
+    }
 }
 
 CatalogManagerReplicaSet* CatalogManagerReplSetTestFixture::catalogManager() const {
@@ -206,7 +215,7 @@ void CatalogManagerReplSetTestFixture::expectGetShards(const std::vector<ShardTy
     });
 }
 
-void CatalogManagerReplSetTestFixture::expectInserts(const NamespaceString nss,
+void CatalogManagerReplSetTestFixture::expectInserts(const NamespaceString& nss,
                                                      const std::vector<BSONObj>& expected) {
     onCommand([&nss, &expected](const RemoteCommandRequest& request) {
         ASSERT_EQUALS(nss.db(), request.dbname);

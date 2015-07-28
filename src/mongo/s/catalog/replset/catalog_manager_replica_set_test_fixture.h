@@ -40,7 +40,7 @@ namespace mongo {
 class BSONObj;
 class CatalogManagerReplicaSet;
 class DistLockManagerMock;
-struct RemoteCommandRequest;
+class NamespaceString;
 class RemoteCommandTargeterFactoryMock;
 class RemoteCommandTargeterMock;
 class ShardRegistry;
@@ -50,6 +50,7 @@ class StatusWith;
 
 namespace executor {
 class NetworkInterfaceMock;
+class TaskExecutor;
 }  // namespace executor
 
 /**
@@ -107,7 +108,7 @@ protected:
      * Wait for a single insert request and ensures that the items being inserted exactly match the
      * expected items. Responds with a success status.
      */
-    void expectInserts(const NamespaceString nss, const std::vector<BSONObj>& expected);
+    void expectInserts(const NamespaceString& nss, const std::vector<BSONObj>& expected);
 
     /**
      * Waits for a count command and returns a response reporting the given number of documents
@@ -138,6 +139,8 @@ protected:
 
     void tearDown() override;
 
+    void shutdownExecutor();
+
 private:
     std::unique_ptr<ServiceContext> _service;
     ServiceContext::UniqueClient _client;
@@ -148,6 +151,7 @@ private:
     RemoteCommandTargeterMock* _configTargeter;
 
     executor::NetworkInterfaceMock* _mockNetwork;
+    executor::TaskExecutor* _executor;
     std::unique_ptr<executor::NetworkTestEnv> _networkTestEnv;
 };
 

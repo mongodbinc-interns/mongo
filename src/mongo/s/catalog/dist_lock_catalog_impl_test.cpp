@@ -38,9 +38,9 @@
 #include "mongo/db/commands.h"
 #include "mongo/db/jsobj.h"
 #include "mongo/db/query/find_and_modify_request.h"
-#include "mongo/db/repl/replication_executor.h"
 #include "mongo/executor/network_interface_mock.h"
 #include "mongo/executor/network_test_env.h"
+#include "mongo/executor/thread_pool_task_executor_test_fixture.h"
 #include "mongo/s/catalog/catalog_manager_mock.h"
 #include "mongo/s/catalog/dist_lock_catalog_impl.h"
 #include "mongo/s/catalog/type_lockpings.h"
@@ -57,6 +57,8 @@ namespace mongo {
 using std::vector;
 using executor::NetworkInterfaceMock;
 using executor::NetworkTestEnv;
+using executor::RemoteCommandRequest;
+using executor::RemoteCommandResponse;
 
 namespace {
 
@@ -84,7 +86,7 @@ public:
     }
 
     RemoteCommandTargeterMock* targeter() {
-        return &_targeter;
+        return RemoteCommandTargeterMock::get(_shardRegistry->getShard("config")->getTargeter());
     }
 
     DistLockCatalogImpl* catalog() {
@@ -101,24 +103,20 @@ public:
 
 private:
     void setUp() override {
-        _targeter.setFindHostReturnValue(dummyHost);
-
         auto networkUniquePtr = stdx::make_unique<executor::NetworkInterfaceMock>();
         executor::NetworkInterfaceMock* network = networkUniquePtr.get();
-        auto executor =
-            stdx::make_unique<repl::ReplicationExecutor>(networkUniquePtr.release(), nullptr, 0);
+        auto executor = executor::makeThreadPoolTestExecutor(std::move(networkUniquePtr));
 
         _networkTestEnv = stdx::make_unique<NetworkTestEnv>(executor.get(), network);
 
-        _shardRegistry =
-            stdx::make_unique<ShardRegistry>(stdx::make_unique<RemoteCommandTargeterFactoryMock>(),
-                                             std::move(executor),
-                                             network,
-                                             &_catalogMgr);
+        _shardRegistry = stdx::make_unique<ShardRegistry>(
+            stdx::make_unique<RemoteCommandTargeterFactoryMock>(), std::move(executor), network);
+        _shardRegistry->init(&_catalogMgr);
         _shardRegistry->startup();
 
-        _distLockCatalog =
-            stdx::make_unique<DistLockCatalogImpl>(&_targeter, _shardRegistry.get(), kWTimeout);
+        _distLockCatalog = stdx::make_unique<DistLockCatalogImpl>(_shardRegistry.get(), kWTimeout);
+
+        targeter()->setFindHostReturnValue(dummyHost);
     }
 
     void tearDown() override {
@@ -129,7 +127,6 @@ private:
 
     std::unique_ptr<executor::NetworkTestEnv> _networkTestEnv;
 
-    RemoteCommandTargeterMock _targeter;
     CatalogManagerMock _catalogMgr;
 
     std::unique_ptr<ShardRegistry> _shardRegistry;
@@ -156,7 +153,7 @@ TEST_F(DistLockCatalogFixture, BasicPing) {
                     }
                 },
                 upsert: true,
-                writeConcern: { w: "majority", j: true, wtimeout: 100 }
+                writeConcern: { w: "majority", wtimeout: 100 }
             })"));
 
         ASSERT_EQUALS(expectedCmd, request.cmdObj);
@@ -309,7 +306,7 @@ TEST_F(DistLockCatalogFixture, GrabLockNoOp) {
                 },
                 upsert: true,
                 new: true,
-                writeConcern: { w: "majority", j: true, wtimeout: 100 }
+                writeConcern: { w: "majority", wtimeout: 100 }
             })"));
 
         ASSERT_EQUALS(expectedCmd, request.cmdObj);
@@ -355,7 +352,7 @@ TEST_F(DistLockCatalogFixture, GrabLockWithNewDoc) {
                 },
                 upsert: true,
                 new: true,
-                writeConcern: { w: "majority", j: true, wtimeout: 100 }
+                writeConcern: { w: "majority", wtimeout: 100 }
             })"));
 
         ASSERT_EQUALS(expectedCmd, request.cmdObj);
@@ -592,7 +589,7 @@ TEST_F(DistLockCatalogFixture, OvertakeLockNoOp) {
                     }
                 },
                 new: true,
-                writeConcern: { w: "majority", j: true, wtimeout: 100 }
+                writeConcern: { w: "majority", wtimeout: 100 }
             })"));
 
         ASSERT_EQUALS(expectedCmd, request.cmdObj);
@@ -644,7 +641,7 @@ TEST_F(DistLockCatalogFixture, OvertakeLockWithNewDoc) {
                     }
                 },
                 new: true,
-                writeConcern: { w: "majority", j: true, wtimeout: 100 }
+                writeConcern: { w: "majority", wtimeout: 100 }
             })"));
 
         ASSERT_EQUALS(expectedCmd, request.cmdObj);
@@ -830,7 +827,7 @@ TEST_F(DistLockCatalogFixture, BasicUnlock) {
                 findAndModify: "locks",
                 query: { ts: ObjectId("555f99712c99a78c5b083358") },
                 update: { $set: { state: 0 }},
-                writeConcern: { w: "majority", j: true, wtimeout: 100 }
+                writeConcern: { w: "majority", wtimeout: 100 }
             })"));
 
         ASSERT_EQUALS(expectedCmd, request.cmdObj);
@@ -862,7 +859,7 @@ TEST_F(DistLockCatalogFixture, UnlockWithNoNewDoc) {
                 findAndModify: "locks",
                 query: { ts: ObjectId("555f99712c99a78c5b083358") },
                 update: { $set: { state: 0 }},
-                writeConcern: { w: "majority", j: true, wtimeout: 100 }
+                writeConcern: { w: "majority", wtimeout: 100 }
             })"));
 
         ASSERT_EQUALS(expectedCmd, request.cmdObj);
@@ -1141,7 +1138,7 @@ TEST_F(DistLockCatalogFixture, BasicStopPing) {
                 findAndModify: "lockpings",
                 query: { _id: "test" },
                 remove: true,
-                writeConcern: { w: "majority", j: true, wtimeout: 100 }
+                writeConcern: { w: "majority", wtimeout: 100 }
             })"));
 
         ASSERT_EQUALS(expectedCmd, request.cmdObj);

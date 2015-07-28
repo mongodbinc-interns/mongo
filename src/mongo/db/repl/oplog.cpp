@@ -41,16 +41,16 @@
 #include "mongo/bson/util/bson_extract.h"
 #include "mongo/db/auth/action_set.h"
 #include "mongo/db/auth/action_type.h"
-#include "mongo/db/auth/authorization_manager.h"
 #include "mongo/db/auth/authorization_manager_global.h"
+#include "mongo/db/auth/authorization_manager.h"
 #include "mongo/db/auth/privilege.h"
 #include "mongo/db/background.h"
 #include "mongo/db/catalog/apply_ops.h"
 #include "mongo/db/catalog/capped_utils.h"
-#include "mongo/db/catalog/create_collection.h"
 #include "mongo/db/catalog/coll_mod.h"
-#include "mongo/db/catalog/collection.h"
 #include "mongo/db/catalog/collection_catalog_entry.h"
+#include "mongo/db/catalog/collection.h"
+#include "mongo/db/catalog/create_collection.h"
 #include "mongo/db/catalog/drop_collection.h"
 #include "mongo/db/catalog/drop_database.h"
 #include "mongo/db/catalog/drop_indexes.h"
@@ -61,29 +61,32 @@
 #include "mongo/db/db_raii.h"
 #include "mongo/db/dbdirectclient.h"
 #include "mongo/db/dbhelpers.h"
-#include "mongo/db/service_context.h"
 #include "mongo/db/global_timestamp.h"
 #include "mongo/db/index_builder.h"
+#include "mongo/db/index/index_access_method.h"
+#include "mongo/db/keypattern.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/op_observer.h"
 #include "mongo/db/operation_context_impl.h"
 #include "mongo/db/ops/delete.h"
-#include "mongo/db/ops/update.h"
 #include "mongo/db/ops/update_lifecycle_impl.h"
+#include "mongo/db/ops/update.h"
 #include "mongo/db/repl/bgsync.h"
 #include "mongo/db/repl/oplogreader.h"
 #include "mongo/db/repl/optime.h"
 #include "mongo/db/repl/repl_client_info.h"
 #include "mongo/db/repl/replication_coordinator_global.h"
 #include "mongo/db/repl/snapshot_thread.h"
+#include "mongo/db/service_context.h"
 #include "mongo/db/stats/counters.h"
-#include "mongo/db/storage/storage_engine.h"
 #include "mongo/db/storage_options.h"
+#include "mongo/db/storage/storage_engine.h"
 #include "mongo/platform/random.h"
 #include "mongo/s/d_state.h"
 #include "mongo/scripting/engine.h"
 #include "mongo/stdx/memory.h"
 #include "mongo/util/elapsed_tracker.h"
+#include "mongo/util/fail_point_service.h"
 #include "mongo/util/file.h"
 #include "mongo/util/log.h"
 #include "mongo/util/mongoutils/str.h"
@@ -100,6 +103,8 @@ namespace repl {
 std::string rsOplogName = "local.oplog.rs";
 std::string masterSlaveOplogName = "local.oplog.$main";
 int OPLOG_VERSION = 2;
+
+MONGO_FP_DECLARE(disableSnapshotting);
 
 namespace {
 // cached copies of these...so don't rename them, drop them, etc.!!!
@@ -576,11 +581,11 @@ Status applyOperation_inlock(OperationContext* txn,
         if (supportsDocLocking()) {
             // WiredTiger, and others requires MODE_IX since the applier threads driving
             // this allow writes to the same collection on any thread.
-            invariant(txn->lockState()->isCollectionLockedForMode(ns, MODE_IX));
+            dassert(txn->lockState()->isCollectionLockedForMode(ns, MODE_IX));
         } else {
             // mmapV1 ensures that all operations to the same collection are executed from
             // the same worker thread, so it takes an exclusive lock (MODE_X)
-            invariant(txn->lockState()->isCollectionLockedForMode(ns, MODE_X));
+            dassert(txn->lockState()->isCollectionLockedForMode(ns, MODE_X));
         }
     }
     Collection* collection = db->getCollection(ns);
@@ -607,25 +612,49 @@ Status applyOperation_inlock(OperationContext* txn,
                 Status status = builder.buildInForeground(txn, db);
                 uassertStatusOK(status);
             }
-        } else {
-            // do upserts for inserts as we might get replayed more than once
+            // Since this is an index operation we can return without falling through.
+            return Status::OK();
+        }
+
+        uassert(
+            ErrorCodes::NamespaceNotFound,
+            str::stream() << "Failed to apply insert due to missing collection: " << op.toString(),
+            collection);
+
+        // No _id.
+        // This indicates an issue with the upstream server:
+        //     The oplog entry is corrupted; or
+        //     The version of the upstream server is obsolete.
+        uassert(ErrorCodes::NoSuchKey,
+                str::stream() << "Failed to apply insert due to missing _id: " << op.toString(),
+                o.hasField("_id"));
+
+        // 1. Try insert first
+        // 2. If okay, commit
+        // 3. If not, do update (and commit)
+        // 4. If both !Ok, return status
+        StatusWith<RecordId> status{ErrorCodes::NotYetInitialized, ""};
+        {
+            WriteUnitOfWork wuow(txn);
+            try {
+                status = collection->insertDocument(txn, o, true);
+            } catch (DBException dbe) {
+                status = StatusWith<RecordId>(dbe.toStatus());
+            }
+            if (status.isOK()) {
+                wuow.commit();
+            }
+        }
+        // Now see if we need to do an update, based on duplicate _id index key
+        if (!status.isOK()) {
+            if (status.getStatus().code() != ErrorCodes::DuplicateKey) {
+                return status.getStatus();
+            }
+
+            // Do update on DuplicateKey errors.
+            // This will only be on the _id field in replication,
+            // since we disable non-_id unique constraint violations.
             OpDebug debug;
-
-            uassert(ErrorCodes::NamespaceNotFound,
-                    str::stream() << "Failed to apply insert due to missing collection: "
-                                  << op.toString(),
-                    collection);
-
-            // No _id.
-            // This indicates an issue with the upstream server:
-            //     The oplog entry is corrupted; or
-            //     The version of the upstream server is obsolete.
-            uassert(ErrorCodes::NoSuchKey,
-                    str::stream() << "Failed to apply insert due to missing _id: " << op.toString(),
-                    o.hasField("_id"));
-
-            // TODO: It may be better to do an insert here, and then catch the duplicate
-            // key exception and do update then. Very few upserts will not be inserts...
             BSONObjBuilder b;
             b.append(o.getField("_id"));
 
@@ -638,7 +667,12 @@ Status applyOperation_inlock(OperationContext* txn,
             UpdateLifecycleImpl updateLifecycle(true, requestNs);
             request.setLifecycle(&updateLifecycle);
 
-            update(txn, db, request, &debug);
+            UpdateResult res = update(txn, db, request, &debug);
+            if (res.numMatched == 0) {
+                error() << "No document was updated even though we got a DuplicateKey error when"
+                           " inserting";
+                fassertFailedNoTrace(28750);
+            }
         }
     } else if (*opType == 'u') {
         opCounters->gotUpdate();
@@ -714,8 +748,8 @@ Status applyOperation_inlock(OperationContext* txn,
     } else if (*opType == 'n') {
         // no op
     } else {
-        throw MsgAssertionException(14825,
-                                    ErrorMsg("error in applyOperation : unknown opType ", *opType));
+        throw MsgAssertionException(
+            14825, str::stream() << "error in applyOperation : unknown opType " << *opType);
     }
 
     // AuthorizationManager's logOp method registers a RecoveryUnit::Change
@@ -738,10 +772,15 @@ Status applyCommand_inlock(OperationContext* txn, const BSONObj& op) {
     const char* opType = fieldOp.valuestrsafe();
     invariant(*opType == 'c');  // only commands are processed here
 
-    BSONObj o;
-    if (fieldO.isABSONObj()) {
-        o = fieldO.embeddedObject();
+    if (fieldO.eoo()) {
+        return Status(ErrorCodes::NoSuchKey, "Missing expected field 'o'");
     }
+
+    if (!fieldO.isABSONObj()) {
+        return Status(ErrorCodes::BadValue, "Expected object for field 'o'");
+    }
+
+    BSONObj o = fieldO.embeddedObject();
 
     const char* ns = fieldNs.valuestrsafe();
 
@@ -752,7 +791,13 @@ Status applyCommand_inlock(OperationContext* txn, const BSONObj& op) {
     bool done = false;
 
     while (!done) {
-        ApplyOpMetadata curOpToApply = opsMap.find(o.firstElementFieldName())->second;
+        auto op = opsMap.find(o.firstElementFieldName());
+        if (op == opsMap.end()) {
+            return Status(ErrorCodes::BadValue,
+                          mongoutils::str::stream() << "Invalid key '" << o.firstElementFieldName()
+                                                    << "' found in field 'o'");
+        }
+        ApplyOpMetadata curOpToApply = op->second;
         Status status = Status::OK();
         try {
             status = curOpToApply.applyFunc(txn, ns, o);
@@ -805,15 +850,6 @@ Status applyCommand_inlock(OperationContext* txn, const BSONObj& op) {
     wuow.commit();
 
     return Status::OK();
-}
-
-void waitUpToOneSecondForTimestampChange(const Timestamp& referenceTime) {
-    stdx::unique_lock<stdx::mutex> lk(newOpMutex);
-
-    while (referenceTime == getLastSetTimestamp()) {
-        if (stdx::cv_status::timeout == newTimestampNotifier.wait_for(lk, stdx::chrono::seconds(1)))
-            return;
-    }
 }
 
 void setNewTimestamp(const Timestamp& newTime) {
@@ -873,6 +909,14 @@ void SnapshotThread::run() {
                 }
 
                 newTimestampNotifier.wait(lock);
+            }
+        }
+
+        while (MONGO_FAIL_POINT(disableSnapshotting)) {
+            sleepsecs(1);
+            stdx::unique_lock<stdx::mutex> lock(newOpMutex);
+            if (_inShutdown) {
+                return;
             }
         }
 

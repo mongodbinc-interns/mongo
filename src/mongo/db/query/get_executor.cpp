@@ -455,7 +455,7 @@ StatusWith<unique_ptr<PlanExecutor>> getExecutor(OperationContext* txn,
         !collection->getIndexCatalog()->findIdIndex(txn)) {
         const WhereCallbackReal whereCallback(txn, collection->ns().db());
         auto statusWithCQ =
-            CanonicalQuery::canonicalize(collection->ns().ns(), unparsedQuery, whereCallback);
+            CanonicalQuery::canonicalize(collection->ns(), unparsedQuery, whereCallback);
         if (!statusWithCQ.isOK()) {
             return statusWithCQ.getStatus();
         }
@@ -952,7 +952,7 @@ StatusWith<unique_ptr<PlanExecutor>> getExecutorGroup(OperationContext* txn,
     const WhereCallbackReal whereCallback(txn, nss.db());
 
     auto statusWithCQ =
-        CanonicalQuery::canonicalize(request.ns, request.query, request.explain, whereCallback);
+        CanonicalQuery::canonicalize(nss, request.query, request.explain, whereCallback);
     if (!statusWithCQ.isOK()) {
         return statusWithCQ.getStatus();
     }
@@ -1177,7 +1177,7 @@ StatusWith<unique_ptr<PlanExecutor>> getExecutorCount(OperationContext* txn,
         unique_ptr<PlanStage> root =
             make_unique<CountStage>(txn, collection, request, ws.get(), nullptr);
         return PlanExecutor::make(
-            txn, std::move(ws), std::move(root), request.getNs(), yieldPolicy);
+            txn, std::move(ws), std::move(root), request.getNs().ns(), yieldPolicy);
     }
 
     unique_ptr<CanonicalQuery> cq;
@@ -1212,7 +1212,7 @@ StatusWith<unique_ptr<PlanExecutor>> getExecutorCount(OperationContext* txn,
         unique_ptr<PlanStage> root =
             make_unique<CountStage>(txn, collection, request, ws.get(), new EOFStage());
         return PlanExecutor::make(
-            txn, std::move(ws), std::move(root), request.getNs(), yieldPolicy);
+            txn, std::move(ws), std::move(root), request.getNs().ns(), yieldPolicy);
     }
 
     invariant(cq.get());
@@ -1339,8 +1339,7 @@ StatusWith<unique_ptr<PlanExecutor>> getExecutorDistinct(OperationContext* txn,
     // If there are no suitable indices for the distinct hack bail out now into regular planning
     // with no projection.
     if (plannerParams.indices.empty()) {
-        auto statusWithCQ =
-            CanonicalQuery::canonicalize(collection->ns().ns(), query, whereCallback);
+        auto statusWithCQ = CanonicalQuery::canonicalize(collection->ns(), query, whereCallback);
         if (!statusWithCQ.isOK()) {
             return statusWithCQ.getStatus();
         }
@@ -1360,8 +1359,8 @@ StatusWith<unique_ptr<PlanExecutor>> getExecutorDistinct(OperationContext* txn,
     BSONObj projection = getDistinctProjection(field);
 
     // Apply a projection of the key.  Empty BSONObj() is for the sort.
-    auto statusWithCQ = CanonicalQuery::canonicalize(
-        collection->ns().ns(), query, BSONObj(), projection, whereCallback);
+    auto statusWithCQ =
+        CanonicalQuery::canonicalize(collection->ns(), query, BSONObj(), projection, whereCallback);
     if (!statusWithCQ.isOK()) {
         return statusWithCQ.getStatus();
     }
@@ -1448,7 +1447,7 @@ StatusWith<unique_ptr<PlanExecutor>> getExecutorDistinct(OperationContext* txn,
     }
 
     // We drop the projection from the 'cq'.  Unfortunately this is not trivial.
-    statusWithCQ = CanonicalQuery::canonicalize(collection->ns().ns(), query, whereCallback);
+    statusWithCQ = CanonicalQuery::canonicalize(collection->ns(), query, whereCallback);
     if (!statusWithCQ.isOK()) {
         return statusWithCQ.getStatus();
     }

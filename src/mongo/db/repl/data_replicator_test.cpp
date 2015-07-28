@@ -37,6 +37,7 @@
 #include "mongo/db/repl/base_cloner_test_fixture.h"
 #include "mongo/db/repl/data_replicator.h"
 #include "mongo/db/repl/member_state.h"
+#include "mongo/db/repl/optime.h"
 #include "mongo/db/repl/replication_executor_test_fixture.h"
 #include "mongo/db/repl/replication_executor.h"
 #include "mongo/db/repl/reporter.h"
@@ -55,6 +56,8 @@ namespace {
 using namespace mongo;
 using namespace mongo::repl;
 using executor::NetworkInterfaceMock;
+using executor::RemoteCommandRequest;
+using executor::RemoteCommandResponse;
 using LockGuard = stdx::lock_guard<stdx::mutex>;
 using UniqueLock = stdx::unique_lock<stdx::mutex>;
 using mutex = stdx::mutex;
@@ -65,7 +68,7 @@ class SyncSourceSelectorMock : public SyncSourceSelector {
 public:
     SyncSourceSelectorMock(const HostAndPort& syncSource) : _syncSource(syncSource) {}
     void clearSyncSourceBlacklist() override {}
-    HostAndPort chooseNewSyncSource() override {
+    HostAndPort chooseNewSyncSource(const Timestamp& ts) override {
         HostAndPort result = _syncSource;
         _syncSource = HostAndPort();
         return result;
@@ -103,8 +106,8 @@ public:
     void clearSyncSourceBlacklist() override {
         _syncSourceSelector->clearSyncSourceBlacklist();
     }
-    HostAndPort chooseNewSyncSource() override {
-        return _syncSourceSelector->chooseNewSyncSource();
+    HostAndPort chooseNewSyncSource(const Timestamp& ts) override {
+        return _syncSourceSelector->chooseNewSyncSource(ts);
     }
     void blacklistSyncSource(const HostAndPort& host, Date_t until) override {
         _syncSourceSelector->blacklistSyncSource(host, until);
@@ -541,7 +544,7 @@ TEST_F(InitialSyncTest, FailsOnClone) {
 class TestSyncSourceSelector2 : public SyncSourceSelector {
 public:
     void clearSyncSourceBlacklist() override {}
-    HostAndPort chooseNewSyncSource() override {
+    HostAndPort chooseNewSyncSource(const Timestamp& ts) override {
         LockGuard lk(_mutex);
         auto result = HostAndPort(str::stream() << "host-" << _nextSourceNum++, -1);
         _condition.notify_all();
@@ -672,7 +675,7 @@ class ShutdownExecutorSyncSourceSelector : public SyncSourceSelector {
 public:
     ShutdownExecutorSyncSourceSelector(ReplicationExecutor* exec) : _exec(exec) {}
     void clearSyncSourceBlacklist() override {}
-    HostAndPort chooseNewSyncSource() override {
+    HostAndPort chooseNewSyncSource(const Timestamp& ts) override {
         _exec->shutdown();
         return HostAndPort();
     }

@@ -69,9 +69,9 @@ Tee* migrateLog = RamLog::get("migrate");
 class DeleteNotificationStage final : public PlanStage {
 public:
     DeleteNotificationStage(MigrationSourceManager* migrationSourceManager)
-        : _migrationSourceManager(migrationSourceManager) {}
+        : PlanStage("NOTIFY_DELETE"), _migrationSourceManager(migrationSourceManager) {}
 
-    void invalidate(OperationContext* txn, const RecordId& dl, InvalidationType type) override {
+    void doInvalidate(OperationContext* txn, const RecordId& dl, InvalidationType type) override {
         if (type == INVALIDATION_DELETION) {
             _migrationSourceManager->aboutToDelete(dl);
         }
@@ -81,37 +81,19 @@ public:
         MONGO_UNREACHABLE;
     }
 
-    virtual bool isEOF() {
+    bool isEOF() final {
         MONGO_UNREACHABLE;
     }
 
-    virtual void kill() {}
-
-    virtual void saveState() {
+    unique_ptr<PlanStageStats> getStats() final {
         MONGO_UNREACHABLE;
     }
 
-    virtual void restoreState(OperationContext* opCtx) {
+    SpecificStats* getSpecificStats() const final {
         MONGO_UNREACHABLE;
     }
 
-    virtual unique_ptr<PlanStageStats> getStats() {
-        MONGO_UNREACHABLE;
-    }
-
-    virtual CommonStats* getCommonStats() const {
-        MONGO_UNREACHABLE;
-    }
-
-    virtual SpecificStats* getSpecificStats() const {
-        MONGO_UNREACHABLE;
-    }
-
-    virtual std::vector<PlanStage*> getChildren() const {
-        return {};
-    }
-
-    virtual StageType stageType() const {
+    StageType stageType() const final {
         return STAGE_NOTIFY_DELETE;
     }
 

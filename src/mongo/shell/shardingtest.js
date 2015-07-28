@@ -84,7 +84,7 @@ ShardingTest = function( testName , numShards , verboseLevel , numMongos , other
 
     // Check if testName is an object, if so, pull params from there
     var keyFile = undefined
-    var numConfigs = 1;
+    var numConfigs = 2;
     otherParams = Object.merge( otherParams || {}, {} )
 
     if( isObject( testName ) ){
@@ -98,7 +98,7 @@ ShardingTest = function( testName , numShards , verboseLevel , numMongos , other
         numShards = otherParams.shards || 2
         verboseLevel = otherParams.verbose || 0
         numMongos = otherParams.mongos || 1
-        numConfigs = otherParams.config || 1;
+        numConfigs = otherParams.config || numConfigs;
 
         var tempCount = 0;
         
@@ -312,16 +312,18 @@ ShardingTest = function( testName , numShards , verboseLevel , numMongos , other
     }
     else {
         // Using replica set for config servers
-        assert.eq(1, numConfigs);
 
         var rstOptions = { useHostName : otherParams.useHostname,
                            startPort : 29000,
                            keyFile : keyFile,
                            name: testName + "-configRS"
                       };
+
+        // when using CSRS, always use wiredTiger as the storage engine
         var startOptions = { pathOpts: pathOpts,
                              configsvr : "",
                              noJournalPrealloc : otherParams.nopreallocj,
+                             storageEngine : "wiredTiger"
                            };
 
         startOptions = Object.merge( startOptions, ShardingTest.configOptions || {} )
@@ -616,7 +618,7 @@ ShardingTest.prototype.adminCommand = function(cmd){
     if ( res && res.ok == 1 )
         return true;
 
-    throw Error( "command " + tojson( cmd ) + " failed: " + tojson( res ) );
+    throw _getErrorWithCode(res, "command " + tojson(cmd) + " failed: " + tojson(res));
 }
 
 ShardingTest.prototype._rangeToString = function(r){
@@ -1137,18 +1139,43 @@ ShardingTest.prototype.stopMongos = function(n) {
 };
 
 /**
- * Restarts a previously stopped mongos using the same parameter as before.
+ * Kills the mongod with index n.
+ */
+ShardingTest.prototype.stopMongod = function(n) {
+    MongoRunner.stopMongod(this['d' + n].port);
+};
+
+/**
+ * Restarts a previously stopped mongos using the same parameters as before.
  *
- * Warning: Overwrites the old s (if n = 0) and sn member variables
+ * Warning: Overwrites the old s (if n = 0) and sn member variables.
  */
 ShardingTest.prototype.restartMongos = function(n) {
-    this.stopMongos(n);
-    var newConn = MongoRunner.runMongos(this['s' + n].commandLine);
+    var mongos = this['s' + n];
+    MongoRunner.stopMongos(mongos);
+    mongos.restart = true;
+
+    var newConn = MongoRunner.runMongos(mongos);
 
     this['s' + n] = newConn;
     if (n == 0) {
         this.s = newConn;
     }
+};
+
+/**
+ * Restarts a previously stopped mongod using the same parameters as before.
+ *
+ * Warning: Overwrites the old dn member variables.
+ */
+ShardingTest.prototype.restartMongod = function(n) {
+    var mongod = this['d' + n];
+    MongoRunner.stopMongod(mongod);
+    mongod.restart = true;
+
+    var newConn = MongoRunner.runMongod(mongod);
+
+    this['d' + n] = newConn;
 };
 
 /**

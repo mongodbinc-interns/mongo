@@ -35,7 +35,7 @@
 #include "mongo/client/dbclientinterface.h"
 #include "mongo/db/dbmessage.h"
 #include "mongo/db/namespace_string.h"
-#include "mongo/db/repl/read_after_optime_args.h"
+#include "mongo/db/repl/read_concern_args.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/mongoutils/str.h"
 
@@ -71,7 +71,6 @@ Status checkFieldType(const BSONElement& el, BSONType type) {
 }
 
 // Find command field names.
-const char kCmdName[] = "find";
 const char kFilterField[] = "filter";
 const char kProjectionField[] = "projection";
 const char kSortField[] = "sort";
@@ -96,6 +95,8 @@ const char kTermField[] = "term";
 
 }  // namespace
 
+const char LiteParsedQuery::kFindCommandName[] = "find";
+
 LiteParsedQuery::LiteParsedQuery(NamespaceString nss) : _nss(std::move(nss)) {}
 
 // static
@@ -111,7 +112,7 @@ StatusWith<unique_ptr<LiteParsedQuery>> LiteParsedQuery::makeFromFindCommand(Nam
     while (it.more()) {
         BSONElement el = it.next();
         const char* fieldName = el.fieldName();
-        if (str::equals(fieldName, kCmdName)) {
+        if (str::equals(fieldName, kFindCommandName)) {
             Status status = checkFieldType(el, String);
             if (!status.isOK()) {
                 return status;
@@ -334,8 +335,8 @@ StatusWith<unique_ptr<LiteParsedQuery>> LiteParsedQuery::makeFromFindCommand(Nam
                                             << ". "
                                             << "You may need to update your shell or driver.");
             }
-        } else if (str::equals(fieldName, repl::ReadAfterOpTimeArgs::kRootFieldName.c_str())) {
-            // read after optime parsing is handled elsewhere.
+        } else if (str::equals(fieldName, repl::ReadConcernArgs::kReadConcernFieldName.c_str())) {
+            // read concern parsing is handled elsewhere.
             continue;
         } else if (str::equals(fieldName, kTermField)) {
             Status status = checkFieldType(el, NumberLong);
@@ -422,7 +423,7 @@ StatusWith<unique_ptr<LiteParsedQuery>> LiteParsedQuery::makeAsFindCmd(
 BSONObj LiteParsedQuery::asFindCommand() const {
     BSONObjBuilder bob;
 
-    bob.append(kCmdName, _nss.coll());
+    bob.append(kFindCommandName, _nss.coll());
 
     if (!_filter.isEmpty()) {
         bob.append(kFilterField, _filter);
@@ -569,10 +570,10 @@ Status LiteParsedQuery::validate() const {
 
     if (_snapshot) {
         if (!_sort.isEmpty()) {
-            return Status(ErrorCodes::BadValue, "E12001 can't use sort with $snapshot");
+            return Status(ErrorCodes::BadValue, "E12001 can't use sort with snapshot");
         }
         if (!_hint.isEmpty()) {
-            return Status(ErrorCodes::BadValue, "E12002 can't use hint with $snapshot");
+            return Status(ErrorCodes::BadValue, "E12002 can't use hint with snapshot");
         }
     }
 

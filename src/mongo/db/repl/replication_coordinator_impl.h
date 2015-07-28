@@ -156,8 +156,8 @@ public:
 
     virtual OpTime getMyLastOptime() const override;
 
-    virtual ReadAfterOpTimeResponse waitUntilOpTime(OperationContext* txn,
-                                                    const ReadAfterOpTimeArgs& settings) override;
+    virtual ReadConcernResponse waitUntilOpTime(OperationContext* txn,
+                                                const ReadConcernArgs& settings) override;
 
     virtual OID getElectionId() override;
 
@@ -234,7 +234,7 @@ public:
 
     virtual bool isReplEnabled() const override;
 
-    virtual HostAndPort chooseNewSyncSource() override;
+    virtual HostAndPort chooseNewSyncSource(const Timestamp& lastTimestampFetched) override;
 
     virtual void blacklistSyncSource(const HostAndPort& host, Date_t until) override;
 
@@ -260,6 +260,7 @@ public:
 
     virtual void summarizeAsHtml(ReplSetHtmlSummary* s) override;
 
+    virtual void dropAllSnapshots() override;
     /**
      * Get current term from topology coordinator
      */
@@ -778,6 +779,7 @@ private:
      * the most appropriate sync source.
      */
     void _chooseNewSyncSource(const ReplicationExecutor::CallbackArgs& cbData,
+                              const Timestamp& lastTimestampFetched,
                               HostAndPort* newSyncSource);
 
     /**

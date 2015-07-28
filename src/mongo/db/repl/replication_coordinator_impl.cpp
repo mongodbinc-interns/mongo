@@ -47,8 +47,8 @@
 #include "mongo/db/repl/handshake_args.h"
 #include "mongo/db/repl/is_master_response.h"
 #include "mongo/db/repl/last_vote.h"
-#include "mongo/db/repl/read_after_optime_args.h"
-#include "mongo/db/repl/read_after_optime_response.h"
+#include "mongo/db/repl/read_concern_args.h"
+#include "mongo/db/repl/read_concern_response.h"
 #include "mongo/db/repl/repl_client_info.h"
 #include "mongo/db/repl/repl_set_declare_election_winner_args.h"
 #include "mongo/db/repl/repl_set_heartbeat_args.h"
@@ -249,7 +249,10 @@ ReplicaSetConfig ReplicationCoordinatorImpl::getReplicaSetConfig_forTest() {
 
 OpTime ReplicationCoordinatorImpl::getCurrentCommittedSnapshot_forTest() {
     stdx::lock_guard<stdx::mutex> lk(_mutex);
-    return *_currentCommittedSnapshot;
+    if (_currentCommittedSnapshot) {
+        return *_currentCommittedSnapshot;
+    }
+    return OpTime();
 }
 
 void ReplicationCoordinatorImpl::_updateLastVote(const LastVote& lastVote) {
@@ -768,56 +771,52 @@ OpTime ReplicationCoordinatorImpl::getMyLastOptime() const {
     return _getMyLastOptime_inlock();
 }
 
-ReadAfterOpTimeResponse ReplicationCoordinatorImpl::waitUntilOpTime(
-    OperationContext* txn, const ReadAfterOpTimeArgs& settings) {
+ReadConcernResponse ReplicationCoordinatorImpl::waitUntilOpTime(OperationContext* txn,
+                                                                const ReadConcernArgs& settings) {
     const auto& ts = settings.getOpTime();
 
-    if (ts.isNull()) {
-        return ReadAfterOpTimeResponse();
-    }
-
     if (getReplicationMode() != repl::ReplicationCoordinator::modeReplSet) {
-        return ReadAfterOpTimeResponse(
-            Status(ErrorCodes::NotAReplicaSet,
-                   "node needs to be a replica set member to use read after opTime"));
-    }
+        // For master/slave and standalone nodes, readAfterOpTime is not supported, so we return
+        // an error. However, we consider all writes "committed" and can treat MajorityReadConcern
+        // as LocalReadConcern, which is immediately satisfied since there is no OpTime to wait for.
+        if (!ts.isNull()) {
+            return ReadConcernResponse(
+                Status(ErrorCodes::NotAReplicaSet,
+                       "node needs to be a replica set member to use read after opTime"));
 
-// TODO: SERVER-18298 enable code once V1 protocol is fully implemented.
-#if 0
-        if (!isV1ElectionProtocol()) {
-            return ReadAfterOpTimeResponse(Status(ErrorCodes::IncompatibleElectionProtocol,
-                    "node needs to be running on v1 election protocol to "
-                    "use read after opTime"));
+        } else {
+            return ReadConcernResponse(Status::OK(), Milliseconds(0));
         }
-#endif
+    }
 
     Timer timer;
     stdx::unique_lock<stdx::mutex> lock(_mutex);
-    auto loopCondition = [this, settings, ts] {
-        return settings.isReadCommitted()
-            ? !_currentCommittedSnapshot || ts > *_currentCommittedSnapshot
-            : ts > _getMyLastOptime_inlock();
+    bool isMajorityReadConcern =
+        settings.getLevel() == ReadConcernArgs::ReadConcernLevel::kMajorityReadConcern;
+    auto loopCondition = [this, isMajorityReadConcern, ts] {
+        return isMajorityReadConcern ? !_currentCommittedSnapshot || ts > *_currentCommittedSnapshot
+                                     : ts > _getMyLastOptime_inlock();
     };
 
     while (loopCondition()) {
         Status interruptedStatus = txn->checkForInterruptNoAssert();
         if (!interruptedStatus.isOK()) {
-            return ReadAfterOpTimeResponse(interruptedStatus, Milliseconds(timer.millis()));
+            return ReadConcernResponse(interruptedStatus, Milliseconds(timer.millis()));
         }
 
         if (_inShutdown) {
-            return ReadAfterOpTimeResponse(Status(ErrorCodes::ShutdownInProgress, "shutting down"),
-                                           Milliseconds(timer.millis()));
+            return ReadConcernResponse(Status(ErrorCodes::ShutdownInProgress, "shutting down"),
+                                       Milliseconds(timer.millis()));
         }
 
         stdx::condition_variable condVar;
         WriteConcernOptions writeConcern;
         writeConcern.wMode = WriteConcernOptions::kMajority;
 
-        WaiterInfo waitInfo(&_opTimeWaiterList,
+        WaiterInfo waitInfo(isMajorityReadConcern ? &_replicationWaiterList : &_opTimeWaiterList,
                             txn->getOpID(),
                             &ts,
-                            settings.isReadCommitted() ? &writeConcern : nullptr,
+                            isMajorityReadConcern ? &writeConcern : nullptr,
                             &condVar);
 
         if (CurOp::get(txn)->isMaxTimeSet()) {
@@ -827,7 +826,7 @@ ReadAfterOpTimeResponse ReplicationCoordinatorImpl::waitUntilOpTime(
         }
     }
 
-    return ReadAfterOpTimeResponse(Status::OK(), Milliseconds(timer.millis()));
+    return ReadConcernResponse(Status::OK(), Milliseconds(timer.millis()));
 }
 
 OpTime ReplicationCoordinatorImpl::_getMyLastOptime_inlock() const {
@@ -901,7 +900,6 @@ Status ReplicationCoordinatorImpl::_setLastOptime_inlock(const UpdatePositionArg
     if (slaveInfo->opTime < args.ts) {
         _updateSlaveInfoOptime_inlock(slaveInfo, args.ts);
     }
-    _updateLastCommittedOpTime_inlock();
     return Status::OK();
 }
 
@@ -1046,7 +1044,7 @@ ReplicationCoordinator::StatusAndDuration ReplicationCoordinatorImpl::_awaitRepl
     const OpTime& opTime,
     const WriteConcernOptions& writeConcern) {
     const Mode replMode = getReplicationMode();
-    if (replMode == modeNone || serverGlobalParams.configsvr) {
+    if (replMode == modeNone) {
         // no replication check needed (validated above)
         return StatusAndDuration(Status::OK(), Milliseconds(timer->millis()));
     }
@@ -1602,7 +1600,7 @@ void ReplicationCoordinatorImpl::_processReplicationMetadata_incallback(
     }
     _setLastCommittedOpTime(replMetadata.getLastOpCommitted());
     if (_updateTerm_incallback(replMetadata.getTerm(), nullptr)) {
-        _topCoord->setPrimaryByMemberId(replMetadata.getPrimaryId());
+        _topCoord->setPrimaryIndex(replMetadata.getPrimaryIndex());
     }
 }
 
@@ -1791,6 +1789,15 @@ void ReplicationCoordinatorImpl::_processHeartbeatFinish(
         // is the only reason for a remote node to send this node a heartbeat request.
         if (!args.getSenderHost().empty() && _seedList.insert(args.getSenderHost()).second) {
             _scheduleHeartbeatToTarget(args.getSenderHost(), -1, now);
+        }
+    } else if (outStatus->isOK() && response->getConfigVersion() < args.getConfigVersion()) {
+        // Schedule a heartbeat to the sender to fetch the new config.
+        // We cannot cancel the enqueued heartbeat, but either this one or the enqueued heartbeat
+        // will trigger reconfig, which cancels and reschedules all heartbeats.
+
+        if (args.hasSenderHost()) {
+            int senderIndex = _rsConfig.findMemberIndexByHostAndPort(args.getSenderHost());
+            _scheduleHeartbeatToTarget(args.getSenderHost(), senderIndex, now);
         }
     }
 }
@@ -2411,19 +2418,22 @@ bool ReplicationCoordinatorImpl::isReplEnabled() const {
 }
 
 void ReplicationCoordinatorImpl::_chooseNewSyncSource(
-    const ReplicationExecutor::CallbackArgs& cbData, HostAndPort* newSyncSource) {
+    const ReplicationExecutor::CallbackArgs& cbData,
+    const Timestamp& lastTimestampFetched,
+    HostAndPort* newSyncSource) {
     if (cbData.status == ErrorCodes::CallbackCanceled) {
         return;
     }
-    *newSyncSource = _topCoord->chooseNewSyncSource(_replExecutor.now(), getMyLastOptime());
+    *newSyncSource = _topCoord->chooseNewSyncSource(_replExecutor.now(), lastTimestampFetched);
 }
 
-HostAndPort ReplicationCoordinatorImpl::chooseNewSyncSource() {
+HostAndPort ReplicationCoordinatorImpl::chooseNewSyncSource(const Timestamp& lastTimestampFetched) {
     HostAndPort newSyncSource;
     CBHStatus cbh =
         _replExecutor.scheduleWork(stdx::bind(&ReplicationCoordinatorImpl::_chooseNewSyncSource,
                                               this,
                                               stdx::placeholders::_1,
+                                              lastTimestampFetched,
                                               &newSyncSource));
     if (cbh.getStatus() == ErrorCodes::ShutdownInProgress) {
         return newSyncSource;  // empty
@@ -2563,6 +2573,11 @@ void ReplicationCoordinatorImpl::_setLastCommittedOpTime_inlock(const OpTime& co
         // Forget about all snapshots <= the new commit point.
         _uncommittedSnapshots.erase(_uncommittedSnapshots.begin(), onePastCommitPoint);
 
+        // Update committed snapshot and wake up any threads waiting on read concern or
+        // write concern.
+        //
+        // This function is only called on secondaries, so only threads waiting for
+        // committed snapshot need to be woken up.
         _updateCommittedSnapshot_inlock(newSnapshot);
     }
 }
@@ -2723,6 +2738,7 @@ void ReplicationCoordinatorImpl::_processHeartbeatFinishV1(
     const Date_t now = _replExecutor.now();
     *outStatus = _topCoord->prepareHeartbeatResponseV1(
         now, args, _settings.ourSetName(), getMyLastOptime(), response);
+
     if ((outStatus->isOK() || *outStatus == ErrorCodes::InvalidReplicaSetConfig) &&
         _selfIndex < 0) {
         // If this node does not belong to the configuration it knows about, send heartbeats
@@ -2731,6 +2747,14 @@ void ReplicationCoordinatorImpl::_processHeartbeatFinishV1(
         // is the only reason for a remote node to send this node a heartbeat request.
         if (!args.getSenderHost().empty() && _seedList.insert(args.getSenderHost()).second) {
             _scheduleHeartbeatToTarget(args.getSenderHost(), -1, now);
+        }
+    } else if (outStatus->isOK() && response->getConfigVersion() < args.getConfigVersion()) {
+        // Schedule a heartbeat to the sender to fetch the new config.
+        // We cannot cancel the enqueued heartbeat, but either this one or the enqueued heartbeat
+        // will trigger reconfig, which cancels and reschedules all heartbeats.
+        if (args.hasSender()) {
+            int senderIndex = _rsConfig.findMemberIndexByHostAndPort(args.getSenderHost());
+            _scheduleHeartbeatToTarget(args.getSenderHost(), senderIndex, now);
         }
     }
 }
@@ -2895,12 +2919,20 @@ void ReplicationCoordinatorImpl::_updateCommittedSnapshot_inlock(OpTime newCommi
 
     _externalState->updateCommittedSnapshot(newCommittedSnapshot);
 
+    // Wake up any threads waiting for read concern or write concern.
+    _wakeReadyWaiters_inlock();
+
     // TODO use _currentCommittedSnapshot for the following things:
     // * SERVER-19206 make w:majority writes block until they are in the committed snapshot.
     // * SERVER-19211 make readCommitted + afterOptime block until the optime is in the
     //   committed view.
     // * SERVER-19212 make new indexes not be used for any queries until the index is in the
     //   committed view.
+}
+
+void ReplicationCoordinatorImpl::dropAllSnapshots() {
+    stdx::lock_guard<stdx::mutex> lock(_mutex);
+    _dropAllSnapshots_inlock();
 }
 
 void ReplicationCoordinatorImpl::_dropAllSnapshots_inlock() {

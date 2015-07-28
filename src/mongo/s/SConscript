@@ -11,6 +11,22 @@ env.SConscript(
     ],
 )
 
+# Functionality for initializing global sharding state
+env.Library(
+    target='sharding_initialization',
+    source=[
+        'sharding_initialization.cpp',
+    ],
+    LIBDEPS=[
+        '$BUILD_DIR/mongo/executor/network_interface_factory',
+        '$BUILD_DIR/mongo/executor/thread_pool_task_executor',
+        '$BUILD_DIR/mongo/s/catalog/dist_lock_catalog_impl',
+        '$BUILD_DIR/mongo/s/catalog/legacy/catalog_manager_legacy',
+        '$BUILD_DIR/mongo/s/catalog/replset/catalog_manager_replica_set',
+        '$BUILD_DIR/mongo/s/catalog/replset/replset_dist_lock_manager',
+    ]
+)
+
 # Functionality shared between mongod and mongos
 env.Library(
     target='common',
@@ -38,7 +54,11 @@ env.CppUnitTest(
         'chunk_version_test.cpp',
     ],
     LIBDEPS=[
+        '$BUILD_DIR/mongo/base',
+        '$BUILD_DIR/mongo/client/clientdriver',
         '$BUILD_DIR/mongo/db/common',
+        '$BUILD_DIR/mongo/db/range_arithmetic',
+        'catalog/catalog_types',
     ]
 )
 
@@ -74,8 +94,8 @@ env.Library(
         'write_ops/write_error_detail.cpp',
     ],
     LIBDEPS=[
-        '$BUILD_DIR/mongo/base/base',
-        '$BUILD_DIR/mongo/bson/bson',
+        '$BUILD_DIR/mongo/base',
+        '$BUILD_DIR/mongo/db/common',
     ],
 )
 
@@ -109,7 +129,7 @@ env.Library(
         'write_ops/batch_write_exec.cpp',
     ],
     LIBDEPS=[
-        '$BUILD_DIR/mongo/bson/bson',
+        '$BUILD_DIR/mongo/base',
         '$BUILD_DIR/mongo/client/clientdriver',
         'batch_write_types',
         '$BUILD_DIR/mongo/util/concurrency/synchronization'
@@ -138,7 +158,7 @@ env.Library(
         'write_ops/batch_downconvert.cpp',
     ],
     LIBDEPS=[
-        '$BUILD_DIR/mongo/bson/bson',
+        '$BUILD_DIR/mongo/base',
         '$BUILD_DIR/mongo/db/common', # for Message
         '$BUILD_DIR/mongo/db/lasterror',
         'cluster_ops',
@@ -174,7 +194,7 @@ env.Library(
         'dbclient_shard_resolver.cpp',
     ],
     LIBDEPS=[
-        '$BUILD_DIR/mongo/bson/bson',
+        '$BUILD_DIR/mongo/base',
         'cluster_ops',
         'cluster_write_op_conversion',
         'client/sharding_client',

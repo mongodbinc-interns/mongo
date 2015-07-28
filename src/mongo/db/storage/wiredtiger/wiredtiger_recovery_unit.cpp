@@ -322,8 +322,8 @@ SnapshotId WiredTigerRecoveryUnit::getSnapshotId() const {
 
 Status WiredTigerRecoveryUnit::setReadFromMajorityCommittedSnapshot() {
     if (!_sessionCache->snapshotManager().haveCommittedSnapshot()) {
-        return {ErrorCodes::XXX_TEMP_NAME_ReadCommittedCurrentlyUnavailable,
-                "XXX_TEMP_NAME_ReadCommittedCurrentlyUnavailable message"};
+        return {ErrorCodes::ReadConcernMajorityNotAvailableYet,
+                "Read concern majority reads are currently not possible."};
     }
 
     _readFromMajorityCommittedSnapshot = true;
@@ -377,19 +377,6 @@ void WiredTigerRecoveryUnit::_txnOpen(OperationContext* opCtx) {
     _timer.reset();
     _active = true;
 }
-
-void WiredTigerRecoveryUnit::beingReleasedFromOperationContext() {
-    LOG(2) << "WiredTigerRecoveryUnit::beingReleased";
-    _currentlySquirreled = true;
-    if (_active == false && !wt_keeptxnopen()) {
-        _commit();
-    }
-}
-void WiredTigerRecoveryUnit::beingSetOnOperationContext() {
-    LOG(2) << "WiredTigerRecoveryUnit::broughtBack";
-    _currentlySquirreled = false;
-}
-
 
 // ---------------------
 

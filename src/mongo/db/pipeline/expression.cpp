@@ -270,6 +270,10 @@ intrusive_ptr<Expression> Expression::parseObject(BSONObj obj,
                         fieldName, ExpressionFieldPath::parse(fieldElement.str(), vps));
                     break;
                 }
+                case Array:
+                    pExpressionObject->addField(fieldName,
+                                                ExpressionArray::parse(fieldElement, vps));
+                    break;
                 case Bool:
                 case NumberDouble:
                 case NumberLong:
@@ -345,6 +349,8 @@ intrusive_ptr<Expression> Expression::parseOperand(BSONElement exprElement,
     } else if (type == Object) {
         ObjectCtx oCtx(ObjectCtx::DOCUMENT_OK);
         return Expression::parseObject(exprElement.Obj(), &oCtx, vps);
+    } else if (type == Array) {
+        return ExpressionArray::parse(exprElement, vps);
     } else {
         return ExpressionConstant::parse(exprElement, vps);
     }
@@ -556,6 +562,32 @@ Value ExpressionAnyElementTrue::evaluateInternal(Variables* vars) const {
 REGISTER_EXPRESSION(anyElementTrue, ExpressionAnyElementTrue::parse);
 const char* ExpressionAnyElementTrue::getOpName() const {
     return "$anyElementTrue";
+}
+
+/* ---------------------- ExpressionArray --------------------------- */
+
+Value ExpressionArray::evaluateInternal(Variables* vars) const {
+    vector<Value> values;
+    values.reserve(vpOperand.size());
+    for (auto&& expr : vpOperand) {
+        Value elemVal = expr->evaluateInternal(vars);
+        values.push_back(elemVal.missing() ? Value(BSONNULL) : std::move(elemVal));
+    }
+    return Value(std::move(values));
+}
+
+Value ExpressionArray::serialize(bool explain) const {
+    vector<Value> expressions;
+    expressions.reserve(vpOperand.size());
+    for (auto&& expr : vpOperand) {
+        expressions.push_back(expr->serialize(explain));
+    }
+    return Value(std::move(expressions));
+}
+
+const char* ExpressionArray::getOpName() const {
+    // This should never be called, but is needed to inherit from ExpressionNary.
+    return "$array";
 }
 
 /* ------------------------- ExpressionArrayElemAt -------------------------- */
@@ -1819,23 +1851,45 @@ REGISTER_EXPRESSION(meta, ExpressionMeta::parse);
 intrusive_ptr<Expression> ExpressionMeta::parse(BSONElement expr,
                                                 const VariablesParseState& vpsIn) {
     uassert(17307, "$meta only supports String arguments", expr.type() == String);
-    uassert(17308, "Unsupported argument to $meta: " + expr.String(), expr.String() == "textScore");
-
-    return new ExpressionMeta();
+    if (expr.valueStringData() == "textScore") {
+        return new ExpressionMeta(MetaType::TEXT_SCORE);
+    } else if (expr.valueStringData() == "randVal") {
+        return new ExpressionMeta(MetaType::RAND_VAL);
+    } else {
+        uasserted(17308, "Unsupported argument to $meta: " + expr.String());
+    }
 }
 
+ExpressionMeta::ExpressionMeta(MetaType metaType) : _metaType(metaType) {}
+
 Value ExpressionMeta::serialize(bool explain) const {
-    return Value(DOC("$meta"
-                     << "textScore"));
+    switch (_metaType) {
+        case MetaType::TEXT_SCORE:
+            return Value(DOC("$meta"
+                             << "textScore"));
+        case MetaType::RAND_VAL:
+            return Value(DOC("$meta"
+                             << "randVal"));
+    }
+    MONGO_UNREACHABLE;
 }
 
 Value ExpressionMeta::evaluateInternal(Variables* vars) const {
     const Document& root = vars->getRoot();
-    return root.hasTextScore() ? Value(root.getTextScore()) : Value();
+    switch (_metaType) {
+        case MetaType::TEXT_SCORE:
+            return root.hasTextScore() ? Value(root.getTextScore()) : Value();
+        case MetaType::RAND_VAL:
+            return root.hasRandMetaField() ? Value(static_cast<long long>(root.getRandMetaField()))
+                                           : Value();
+    }
+    MONGO_UNREACHABLE;
 }
 
 void ExpressionMeta::addDependencies(DepsTracker* deps, vector<string>* path) const {
-    deps->needTextScore = true;
+    if (_metaType == MetaType::TEXT_SCORE) {
+        deps->needTextScore = true;
+    }
 }
 
 /* ------------------------- ExpressionMillisecond ----------------------------- */

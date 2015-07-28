@@ -166,7 +166,7 @@ functions:
             set -o igncr
         fi;
 
-        git checkout r3.1.5
+        git checkout r3.1.6
         . ./${set_tools_gopath|set_gopath.sh}
 
         # In RHEL 5.5, /usr/bin/ld can't handle --build-id parameters, so
@@ -211,7 +211,7 @@ pre:
     params:
       silent: true
       script: |
-        ${killall_mci|pkill -9 mongod; pkill -9 mongos; pkill -9 mongo; pkill -9 bsondump; pkill -9 mongoimport; pkill -9 mongoexport; pkill -9 mongodump; pkill -9 mongorestore; pkill -9 mongostat; pkill -9 mongofiles; pkill -9 mongooplog; pkill -9 mongotop; pkill -9 mongobridge; pkill -9 mongod-2.6; pkill -9 mongos-2.6; pkill -9 mongo-2.6; pkill -9 bsondump-2.6; pkill -9 mongoimport-2.6; pkill -9 mongoexport-2.6; pkill -9 mongodump-2.6; pkill -9 mongorestore-2.6; pkill -9 mongostat-2.6; pkill -9 mongofiles-2.6; pkill -9 mongooplog-2.6; pkill -9 mongotop-2.6; pkill -9 mongobridge-2.6; pkill -9 mongod-2.4; pkill -9 mongos-2.4; pkill -9 mongo-2.4; pkill -9 bsondump-2.4; pkill -9 mongoimport-2.4; pkill -9 mongoexport-2.4; pkill -9 mongodump-2.4; pkill -9 mongorestore-2.4; pkill -9 mongostat-2.4; pkill -9 mongofiles-2.4; pkill -9 mongooplog-2.4; pkill -9 mongotop-2.4; pkill -9 resmoke.py; pkill -9 python; pkill -9 cl; pkill -9 lock_mgr_test; pkill -9 background_job_test; pkill -9 repl_coordinator_impl_heartbeat_test} >/dev/null 2>&1
+        ${killall_mci|pkill -9 mongod; pkill -9 mongos; pkill -9 mongo; pkill -9 bsondump; pkill -9 mongoimport; pkill -9 mongoexport; pkill -9 mongodump; pkill -9 mongorestore; pkill -9 mongostat; pkill -9 mongofiles; pkill -9 mongooplog; pkill -9 mongotop; pkill -9 mongobridge; pkill -9 mongod-2.6; pkill -9 mongos-2.6; pkill -9 mongo-2.6; pkill -9 bsondump-2.6; pkill -9 mongoimport-2.6; pkill -9 mongoexport-2.6; pkill -9 mongodump-2.6; pkill -9 mongorestore-2.6; pkill -9 mongostat-2.6; pkill -9 mongofiles-2.6; pkill -9 mongooplog-2.6; pkill -9 mongotop-2.6; pkill -9 mongobridge-2.6; pkill -9 mongod-2.4; pkill -9 mongos-2.4; pkill -9 mongo-2.4; pkill -9 bsondump-2.4; pkill -9 mongoimport-2.4; pkill -9 mongoexport-2.4; pkill -9 mongodump-2.4; pkill -9 mongorestore-2.4; pkill -9 mongostat-2.4; pkill -9 mongofiles-2.4; pkill -9 mongooplog-2.4; pkill -9 mongotop-2.4; pkill -9 resmoke.py; pkill -9 python; pkill -9 cl; pkill -9 lldb; pkill -9 lock_mgr_test; pkill -9 background_job_test; pkill -9 repl_coordinator_impl_heartbeat_test; pkill -9 repl_coordinator_impl_test} >/dev/null 2>&1
         rm -rf src /data/db/*
         exit 0
 
@@ -223,7 +223,7 @@ post:
     params:
       silent: true
       script: |
-        ${killall_mci|pkill -9 mongod; pkill -9 mongos; pkill -9 mongo; pkill -9 bsondump; pkill -9 mongoimport; pkill -9 mongoexport; pkill -9 mongodump; pkill -9 mongorestore; pkill -9 mongostat; pkill -9 mongofiles; pkill -9 mongooplog; pkill -9 mongotop; pkill -9 mongobridge; pkill -9 mongod-2.6; pkill -9 mongos-2.6; pkill -9 mongo-2.6; pkill -9 bsondump-2.6; pkill -9 mongoimport-2.6; pkill -9 mongoexport-2.6; pkill -9 mongodump-2.6; pkill -9 mongorestore-2.6; pkill -9 mongostat-2.6; pkill -9 mongofiles-2.6; pkill -9 mongooplog-2.6; pkill -9 mongotop-2.6; pkill -9 mongobridge-2.6; pkill -9 mongod-2.4; pkill -9 mongos-2.4; pkill -9 mongo-2.4; pkill -9 bsondump-2.4; pkill -9 mongoimport-2.4; pkill -9 mongoexport-2.4; pkill -9 mongodump-2.4; pkill -9 mongorestore-2.4; pkill -9 mongostat-2.4; pkill -9 mongofiles-2.4; pkill -9 mongooplog-2.4; pkill -9 mongotop-2.4; pkill -9 resmoke.py; pkill -9 python; pkill -9 cl; pkill -9 lock_mgr_test; pkill -9 background_job_test; pkill -9 repl_coordinator_impl_heartbeat_test} >/dev/null 2>&1
+        ${killall_mci|pkill -9 mongod; pkill -9 mongos; pkill -9 mongo; pkill -9 bsondump; pkill -9 mongoimport; pkill -9 mongoexport; pkill -9 mongodump; pkill -9 mongorestore; pkill -9 mongostat; pkill -9 mongofiles; pkill -9 mongooplog; pkill -9 mongotop; pkill -9 mongobridge; pkill -9 mongod-2.6; pkill -9 mongos-2.6; pkill -9 mongo-2.6; pkill -9 bsondump-2.6; pkill -9 mongoimport-2.6; pkill -9 mongoexport-2.6; pkill -9 mongodump-2.6; pkill -9 mongorestore-2.6; pkill -9 mongostat-2.6; pkill -9 mongofiles-2.6; pkill -9 mongooplog-2.6; pkill -9 mongotop-2.6; pkill -9 mongobridge-2.6; pkill -9 mongod-2.4; pkill -9 mongos-2.4; pkill -9 mongo-2.4; pkill -9 bsondump-2.4; pkill -9 mongoimport-2.4; pkill -9 mongoexport-2.4; pkill -9 mongodump-2.4; pkill -9 mongorestore-2.4; pkill -9 mongostat-2.4; pkill -9 mongofiles-2.4; pkill -9 mongooplog-2.4; pkill -9 mongotop-2.4; pkill -9 resmoke.py; pkill -9 python; pkill -9 cl; pkill -9 lldb; pkill -9 lock_mgr_test; pkill -9 background_job_test; pkill -9 repl_coordinator_impl_heartbeat_test; pkill -9 repl_coordinator_impl_test} >/dev/null 2>&1
         exit 0
   - command: shell.cleanup
 
@@ -264,7 +264,6 @@ tasks:
 
           rm -rf ${install_directory|/data/mongo-install-directory}
           ${scons|scons} ${compile_flags|} --use-new-tools all dist dist-debugsymbols distsrc-${ext|tgz} ${msi_target|}
-          ${scons|scons} ${compile_flags|} --use-new-tools intel_tests
 
           ${python|python} buildscripts/generate_compile_expansions.py version.json | \
             tee compile_expansions.yml
@@ -350,26 +349,6 @@ tasks:
           set -o verbose
           ${scons|scons} ${compile_flags|} lint
 
-## intel test ##
-- name: intel_library_test
-  depends_on:
-  - name: compile
-  commands:
-    - func: "do setup"
-    - command: shell.exec
-      params:
-        working_dir: src
-        script: |
-          set -o verbose
-
-          ./build/third_party_tests/intel/readtest < build/third_party_tests/intel/readtest.in | tee tmp.out
-          if grep "FAILED" tmp.out; then
-            rm tmp.out
-            exit 1;
-          fi
-
-          rm tmp.out
-
 ## jstestfuzz ##
 - name: jstestfuzz
   depends_on:
@@ -409,15 +388,25 @@ tasks:
 
           npm install || true
           npm start -- --jsTestsDir ../jstests || true
-    - command: shell.exec
+    - command: archive.targz_pack
       params:
-        working_dir: src
-        script: |
-          set -o errexit
-          set -o verbose
-
-          cp mongodb*/bin/* .
-          ${asan_symbolizer} ${enable_lsan} ${python|python} buildscripts/resmoke.py --log=buildlogger --reportFile=report.json jstestfuzz/out/*.js
+        target: "jstests.tgz"
+        source_dir: "src/jstestfuzz"
+        include:
+          - "out/*.js"
+    - command: s3.put
+      params:
+        aws_key: ${aws_key}
+        aws_secret: ${aws_secret}
+        local_file: jstests.tgz
+        remote_file: mongodb-mongo-master/${build_variant}/${revision}/jstestfuzz/jstestfuzz-${build_id}.tgz
+        bucket: mciuploads
+        permissions: public-read
+        content_type: ${content_type|application/x-gzip}
+        display_name: Generated Tests
+    - func: "run tests"
+      vars:
+        resmoke_args: --suites=jstestfuzz
 
 ## integration test suites ##
 
@@ -516,6 +505,14 @@ tasks:
   - func: "run tests"
     vars:
       resmoke_args: --suites=dur_jscore_passthrough
+
+- <<: *task_template
+  name: ese_WT
+  commands:
+  - func: "do setup"
+  - func: "run tests"
+    vars:
+      resmoke_args: --suites=ese --storageEngine=wiredTiger
 
 - <<: *task_template
   name: failpoints
@@ -646,6 +643,14 @@ tasks:
     vars:
       resmoke_args: --suites=core --storageEngine=wiredTiger
       run_multiple_jobs: true
+
+- <<: *task_template
+  name: jsCore_WT_ese
+  commands:
+  - func: "do setup"
+  - func: "run tests"
+    vars:
+      resmoke_args: --suites=core_ese --storageEngine=wiredTiger
 
 - <<: *task_template
   name: jsCore_compatibility
@@ -974,6 +979,14 @@ tasks:
       resmoke_args: --suites=replica_sets --storageEngine=wiredTiger
 
 - <<: *task_template
+  name: replica_sets_WT_ese
+  commands:
+  - func: "do setup"
+  - func: "run tests"
+    vars:
+      resmoke_args: --suites=replica_sets_ese --storageEngine=wiredTiger
+
+- <<: *task_template
   name: replicasets_auth
   commands:
   - func: "do setup"
@@ -1028,6 +1041,14 @@ tasks:
   - func: "run tests"
     vars:
       resmoke_args: --suites=sharding --storageEngine=wiredTiger
+
+- <<: *task_template
+  name: sharding_WT_ese
+  commands:
+  - func: "do setup"
+  - func: "run tests"
+    vars:
+      resmoke_args: --suites=sharding_ese --storageEngine=wiredTiger
 
 - <<: *task_template
   name: sharding_auth
@@ -1108,6 +1129,22 @@ tasks:
   - func: "run tests"
     vars:
       resmoke_args: --suites=tool --storageEngine=wiredTiger
+
+- <<: *task_template
+  name: jsDecimalCore
+  commands:
+  - func: "do setup"
+  - func: "run tests"
+    vars:
+      resmoke_args: --suites=decimal
+
+- <<: *task_template
+  name: jsDecimalCore_WT
+  commands:
+  - func: "do setup"
+  - func: "run tests"
+    vars:
+      resmoke_args: --suites=decimal --storageEngine=wiredTiger
 
 - name: push
   depends_on:
@@ -1603,9 +1640,9 @@ buildvariants:
   - name: sharding_jscore_passthrough_WT
   - name: tool
   - name: tool_WT
-  # - name: push
-  #   distros:
-  #   - rhel55-test
+  - name: push
+    distros:
+    - rhel55-test
 
 - name: linux-64-debug
   display_name: Linux 64-bit DEBUG
@@ -1628,7 +1665,6 @@ buildvariants:
   - name: compile
     distros:
     - rhel55
-  - name: intel_library_test
   - name: aggregation
   - name: aggregation_WT
   - name: aggregation_auth
@@ -1807,7 +1843,6 @@ buildvariants:
   - name: compile
     distros:
     - ubuntu1204-build
-  - name: intel_library_test
   - name: aggregation
   - name: aggregation_WT
   - name: aggregation_auth
@@ -1879,9 +1914,9 @@ buildvariants:
   - name: sslSpecial
   - name: tool
   - name: tool_WT
-  # - name: push
-  #   distros:
-  #   - rhel55-test
+  - name: push
+    distros:
+    - rhel55-test
 
 - name: ubuntu1404
   display_name: SSL Ubuntu 1404 64-bit
@@ -1902,7 +1937,6 @@ buildvariants:
   - name: compile
     distros:
     - ubuntu1404-build
-  - name: intel_library_test
   - name: aggregation
   - name: aggregation_WT
   - name: aggregation_auth
@@ -1975,9 +2009,9 @@ buildvariants:
   - name: sslSpecial
   - name: tool
   - name: tool_WT
-  # - name: push
-  #   distros:
-  #   - rhel55-test
+  - name: push
+    distros:
+    - rhel55-test
 
 - name: enterprise-linux-64-amazon-ami
   display_name: Enterprise Linux 64-bit Amazon AMI
@@ -2029,9 +2063,9 @@ buildvariants:
   - name: snmp_WT
   - name: ssl
   - name: sslSpecial
-  # - name: push
-  #   distros:
-  #   - rhel55-test
+  - name: push
+    distros:
+    - rhel55-test
 
 - name: amazon
   display_name: SSL Amazon 64-bit
@@ -2123,9 +2157,9 @@ buildvariants:
   - name: sslSpecial
   - name: tool
   - name: tool_WT
-  # - name: push
-  #   distros:
-  #   - rhel55-test
+  - name: push
+    distros:
+    - rhel55-test
 
 - name: linux-32
   display_name: Linux 32-bit
@@ -2147,61 +2181,42 @@ buildvariants:
   - name: compile
     distros:
     - rhel55
-  - name: aggregation
-  - name: auth
   - name: dbtest
   - name: disk
-  - name: durability
-  - name: failpoints
   - name: jsCore
   - name: jsCore_compatibility
   - name: mmap
-  - name: mongosTest
-  - name: replicasets
-  - name: replication
-  - name: sharding
-  - name: tool
-  # - name: push
-  #   distros:
-  #   - rhel55-test
+  - name: push
+    distros:
+    - rhel55-test
 
-- name: linux-32-debug
-  display_name: Linux 32-bit DEBUG
+- name: linux-64-decimal
+  display_name: Linux 64-bit (Experimental Decimal Support)
   modules: ~
   run_on:
-  - rhel55-32
+  - rhel55
   expansions:
     gitvars: LD_LIBRARY_PATH=/opt/openssl/lib64 #needed to workaround the old openSSL on rhel55 builders.
-    gorootvars: GOROOT=/opt/go32 PATH=/opt/go32/bin:$PATH
+    gorootvars: GOROOT=/opt/go PATH="/opt/go/bin:$PATH"
     push_path: linux
     push_bucket: downloads.mongodb.org
-    push_name: linux-debug
-    push_arch: i686
+    push_name: linux
+    push_arch: x86_64
+    compile_flags: -j$(grep -c ^processor /proc/cpuinfo) CC=/opt/mongodbtoolchain/bin/gcc CXX=/opt/mongodbtoolchain/bin/g++ --release --experimental-decimal-support=on
     num_cores: $(grep -c ^processor /proc/cpuinfo)
     num_jobs_unittests: $(grep -c ^processor /proc/cpuinfo)
-    test_flags: --continueOnFailure --storageEngine=mmapv1 -j1  # Avoid starting too many mongod's on 32-bit systems.
-    compile_flags: --dbg=on --distarch=i686 --opt=on -j$(grep -c ^processor /proc/cpuinfo) CC=/opt/mongodbtoolchain/bin/gcc CXX=/opt/mongodbtoolchain/bin/g++ --wiredtiger=off CCFLAGS="-m32" LINKFLAGS="-m32"
+    test_flags: --continueOnFailure
   tasks:
   - name: compile
     distros:
     - rhel55
-  - name: intel_library_test
-    distros:
-    - rhel55
-  - name: aggregation
-  - name: auth
-  - name: dbtest
-  - name: disk
-  - name: durability
-  - name: failpoints
   - name: jsCore
-  - name: jsCore_compatibility
-  - name: mmap
-  - name: mongosTest
-  - name: replicasets
-  - name: replication
-  - name: sharding
-  - name: tool
+  - name: jsDecimalCore
+  - name: jsDecimalCore_WT
+  - name: jstestfuzz
+  - name: push
+    distros:
+    - rhel55-test
 
 ###########################################
 #         Windows buildvariants           #
@@ -2229,7 +2244,6 @@ buildvariants:
   - name: compile
     distros:
     - windows-64-vs2013-compile
-  - name: intel_library_test
   - name: aggregation
   - name: aggregation_WT
   - name: auth
@@ -2291,9 +2305,9 @@ buildvariants:
   - name: sharding_jscore_passthrough_WT
   - name: tool
   - name: tool_WT
-  # - name: push
-  #   distros:
-  #   - rhel55-test
+  - name: push
+    distros:
+    - rhel55-test
 
 - name: windows-64-2k8
   display_name: Windows 64-bit 2008R2+
@@ -2317,7 +2331,6 @@ buildvariants:
   - name: compile
     distros:
     - windows-64-vs2013-compile
-  - name: intel_library_test
   - name: aggregation
   - name: aggregation_WT
   - name: auth
@@ -2367,9 +2380,9 @@ buildvariants:
   - name: sharding_jscore_passthrough_WT
   - name: tool
   - name: tool_WT
-  # - name: push
-  #   distros:
-  #   - rhel55-test
+  - name: push
+    distros:
+    - rhel55-test
 
 - name: windows-64-2k8-debug
   display_name: Windows 64-bit 2008R2+ DEBUG
@@ -2392,7 +2405,6 @@ buildvariants:
   - name: compile
     distros:
     - windows-64-vs2013-compile
-  - name: intel_library_test
   - name: aggregation
   - name: aggregation_WT
   - name: auth
@@ -2466,6 +2478,10 @@ buildvariants:
   - name: audit_WT
   - name: dbtest
   - name: dbtest_WT
+  - name: ese_WT
+  - name: jsCore_WT_ese
+  - name: replica_sets_WT_ese
+  - name: sharding_WT_ese
   - name: jsCore_auth
   - name: mmap
   - name: replicasets_auth
@@ -2475,9 +2491,9 @@ buildvariants:
   - name: snmp_WT
   - name: ssl
   - name: sslSpecial
-  # - name: push
-  #   distros:
-  #   - rhel55-test
+  - name: push
+    distros:
+    - rhel55-test
 
 - name: windows-64-2k8-ssl
   display_name: SSL Windows 64-bit 2008R2+
@@ -2554,9 +2570,9 @@ buildvariants:
   - name: tool_WT
   - name: ssl
   - name: sslSpecial
-  # - name: push
-  #   distros:
-  #   - rhel55-test
+  - name: push
+    distros:
+    - rhel55-test
 
 - name: windows-32
   display_name: Windows 32-bit
@@ -2581,26 +2597,14 @@ buildvariants:
   - name: compile
     distros:
     - windows-64-vs2013-compile
-  - name: intel_library_test
-    distros:
-    - windows-64-vs2013-compile
-  - name: aggregation
-  - name: auth
   - name: dbtest
   - name: disk
-  - name: durability
-  - name: failpoints
   - name: jsCore
   - name: jsCore_compatibility
   - name: mmap
-  - name: mongosTest
-  - name: replicasets
-  - name: replication
-  - name: sharding
-  - name: tool
-  # - name: push
-  #   distros:
-  #   - rhel55-test
+  - name: push
+    distros:
+    - rhel55-test
 
 ###########################################
 #             OSX buildvariants           #
@@ -2683,9 +2687,9 @@ buildvariants:
   - name: sharding_jscore_passthrough_WT
   - name: tool
   - name: tool_WT
-  # - name: push
-  #   distros:
-  #   - rhel55-test
+  - name: push
+    distros:
+    - rhel55-test
 
 - name: osx-108-ssl
   display_name: SSL OS X 10.8
@@ -2767,9 +2771,9 @@ buildvariants:
   - name: sslSpecial
   - name: tool
   - name: tool_WT
-  # - name: push
-  #   distros:
-  #   - rhel55-test
+  - name: push
+    distros:
+    - rhel55-test
 
 - name: osx-108-debug
   display_name: OS X 10.8 DEBUG
@@ -2786,7 +2790,6 @@ buildvariants:
     test_flags: --continueOnFailure
     compile_flags: --dbg=on --opt=on --allocator=system -j$(sysctl -n hw.logicalcpu) --osx-version-min=10.7 --libc++
   tasks:
-  - name: intel_library_test
   - name: compile
   - name: aggregation
   - name: aggregation_WT
@@ -2838,7 +2841,6 @@ buildvariants:
   - name: compile
     distros:
     - rhel55
-  - name: intel_library_test
   - name: lint
   - name: audit
   - name: audit_WT
@@ -2853,9 +2855,9 @@ buildvariants:
   - name: snmp_WT
   - name: ssl
   - name: sslSpecial
-  # - name: push
-  #   distros:
-  #   - rhel55-test
+  - name: push
+    distros:
+    - rhel55-test
 
 - name: enterprise-rhel-62-64-bit
   display_name: Enterprise RHEL 6.2 64-bit
@@ -2883,6 +2885,10 @@ buildvariants:
   - name: audit_WT
   - name: dbtest
   - name: dbtest_WT
+  - name: ese_WT
+  - name: jsCore_WT_ese
+  - name: replica_sets_WT_ese
+  - name: sharding_WT_ese
   - name: mmap
   - name: jsCore_auth
   - name: replicasets_auth
@@ -2894,9 +2900,9 @@ buildvariants:
   - name: snmp_WT
   - name: ssl
   - name: sslSpecial
-  # - name: push
-  #   distros:
-  #   - rhel55-test
+  - name: push
+    distros:
+    - rhel55-test
 
 - name: enterprise-rhel-70-64-bit
   display_name: Enterprise RHEL 7.0 64-bit
@@ -2930,9 +2936,9 @@ buildvariants:
   - name: snmp_WT
   - name: ssl
   - name: sslSpecial
-  # - name: push
-  #   distros:
-  #   - rhel55-test
+  - name: push
+    distros:
+    - rhel55-test
 
 - name: rhel55
   display_name: SSL RHEL 5.5 64-bit
@@ -3027,9 +3033,9 @@ buildvariants:
   - name: sslSpecial
   - name: tool
   - name: tool_WT
-  # - name: push
-  #   distros:
-  #   - rhel55-test
+  - name: push
+    distros:
+    - rhel55-test
 
 - name: rhel62
   display_name: SSL RHEL 6.2 64-bit
@@ -3122,9 +3128,9 @@ buildvariants:
   - name: sslSpecial
   - name: tool
   - name: tool_WT
-  # - name: push
-  #   distros:
-  #   - rhel55-test
+  - name: push
+    distros:
+    - rhel55-test
 
 - name: rhel70
   display_name: SSL RHEL 7.0 64-bit
@@ -3217,9 +3223,9 @@ buildvariants:
   - name: sslSpecial
   - name: tool
   - name: tool_WT
-  # - name: push
-  #   distros:
-  #   - rhel55-test
+  - name: push
+    distros:
+    - rhel55-test
 
 ###########################################
 #          Ubuntu buildvariants           #
@@ -3259,9 +3265,9 @@ buildvariants:
   - name: snmp_WT
   - name: ssl
   - name: sslSpecial
-  # - name: push
-  #   distros:
-  #   - rhel55-test
+  - name: push
+    distros:
+    - rhel55-test
 
 - name: enterprise-ubuntu1404-64
   display_name: Enterprise Ubuntu 1404 64-bit
@@ -3297,9 +3303,9 @@ buildvariants:
   - name: snmp_WT
   - name: ssl
   - name: sslSpecial
-  # - name: push
-  #   distros:
-  #   - rhel55-test
+  - name: push
+    distros:
+    - rhel55-test
 
 ###########################################
 #          SUSE buildvariants             #
@@ -3339,9 +3345,9 @@ buildvariants:
   - name: snmp_WT
   - name: ssl
   - name: sslSpecial
-  # - name: push
-  #   distros:
-  #   - rhel55-test
+  - name: push
+    distros:
+    - rhel55-test
 
 - name: suse11
   display_name: SSL SUSE 11 64-bit
@@ -3363,7 +3369,6 @@ buildvariants:
   - name: compile
     distros:
     - suse11-build
-  - name: intel_library_test
   - name: aggregation
   - name: aggregation_WT
   - name: aggregation_auth
@@ -3435,9 +3440,9 @@ buildvariants:
   - name: sslSpecial
   - name: tool
   - name: tool_WT
-  # - name: push
-  #   distros:
-  #   - rhel55-test
+  - name: push
+    distros:
+    - rhel55-test
 
 ###########################################
 #          Solaris buildvariants          #
@@ -3458,7 +3463,6 @@ buildvariants:
     num_jobs_unittests: $(kstat cpu | sort -u | grep -c "^module")
     test_flags: --continueOnFailure
   tasks:
-  - name: intel_library_test
   - name: compile
   - name: aggregation
   - name: aggregation_WT
@@ -3509,9 +3513,9 @@ buildvariants:
   - name: slow2_WT
   - name: tool
   - name: tool_WT
-  # - name: push
-  #   distros:
-  #   - rhel55-test
+  - name: push
+    distros:
+    - rhel55-test
 
 ###########################################
 #          Debian buildvariants           #
@@ -3551,9 +3555,9 @@ buildvariants:
   - name: snmp_WT
   - name: ssl
   - name: sslSpecial
-  # - name: push
-  #   distros:
-  #   - rhel55-test
+  - name: push
+    distros:
+    - rhel55-test
 
 - name: debian71
   display_name: SSL Debian 7.1 64-bit
@@ -3575,7 +3579,6 @@ buildvariants:
   - name: compile
     distros:
     - debian71-build
-  - name: intel_library_test
   - name: aggregation
   - name: aggregation_WT
   - name: aggregation_auth
@@ -3647,9 +3650,9 @@ buildvariants:
   - name: sslSpecial
   - name: tool
   - name: tool_WT
-  # - name: push
-  #   distros:
-  #   - rhel55-test
+  - name: push
+    distros:
+    - rhel55-test
 
 ##############################################
 # mongo-partner storage engine buildvariants #
@@ -3891,6 +3894,86 @@ buildvariants:
   - name: sslSpecial
   - name: tool
   - name: tool_WT
-  # - name: push
-  #   distros:
-  #   - rhel55-test
+  - name: push
+    distros:
+    - rhel55-test
+
+- name: ubuntu1404-asio
+  display_name: z ASIO SSL Ubuntu 1404 64-bit
+  modules: ~
+  run_on:
+  - ubuntu1404-test
+  expansions:
+    tooltags: "-tags ssl"
+    compile_flags: --ssl --distmod=ubuntu1404 -j$(grep -c ^processor /proc/cpuinfo) --release CC=/opt/mongodbtoolchain/bin/gcc CXX=/opt/mongodbtoolchain/bin/g++
+    num_cores: $(grep -c ^processor /proc/cpuinfo)
+    num_jobs_unittests: $(grep -c ^processor /proc/cpuinfo)
+    test_flags: "--continueOnFailure --mongosSetParameters='{outboundNetworkImpl: 'ASIO'}' --mongodSetParameters='{outboundNetworkImpl: 'ASIO'}'"
+  tasks:
+  - name: compile
+    distros:
+    - ubuntu1404-build
+  - name: aggregation_WT
+  - name: aggregation_auth
+  - name: auth_WT
+  - name: jsCore_small_oplog_rs_WT
+  - name: jstestfuzz
+  - name: mongosTest
+  - name: multiversion
+  - name: noPassthrough_WT
+  - name: noPassthroughWithMongod_WT
+  - name: bulk_gle_passthrough_WT
+  - name: concurrency_replication_WT
+  - name: concurrency_sharded_WT
+  - name: replicasets_WT
+  - name: replicasets_auth
+  - name: replication_WT
+  - name: replication_auth
+  - name: sharding_WT
+  - name: sharding_auth
+  - name: slow1_WT
+  - name: slow2_WT
+  - name: sharding_jscore_passthrough_WT
+  - name: ssl
+  - name: sslSpecial
+  - name: tool_WT
+
+- name: windows-64-2k8-ssl-asio
+  display_name: z ASIO SSL Windows 64-bit 2008R2+
+  modules: ~
+  run_on:
+  - windows-64-vs2013-test
+  expansions:
+    exe: ".exe"
+    gorootvars: 'PATH="/cygdrive/c/mingw-w64/x86_64-4.9.1-posix-seh-rt_v3-rev1/mingw64/bin:/cygdrive/c/sasl/:$PATH"'
+    tooltags: "-tags ssl"
+    msi_target: msi
+    content_type: application/zip
+    compile_flags: --release --ssl --distmod=2008plus-ssl CPPPATH="c:/openssl/include" LIBPATH="c:/openssl/lib" -j$(grep -c ^processor /proc/cpuinfo) --dynamic-windows --win-version-min=ws08r2 VARIANT_DIR=win32
+    num_cores: $(grep -c ^processor /proc/cpuinfo)
+    num_jobs_unittests: $(grep -c ^processor /proc/cpuinfo)
+    test_flags: "--continueOnFailure --mongosSetParameters='{outboundNetworkImpl: 'ASIO'}' --mongodSetParameters='{outboundNetworkImpl: 'ASIO'}'"
+    ext: zip
+  tasks:
+  - name: compile
+    distros:
+    - windows-64-vs2013-compile
+  - name: aggregation_WT
+  - name: auth_WT
+  - name: dbtest_WT
+  - name: jsCore_small_oplog_rs_WT
+  - name: mongosTest
+  - name: noPassthrough_WT
+  - name: noPassthroughWithMongod_WT
+  - name: bulk_gle_passthrough_WT
+  - name: concurrency_replication_WT
+  - name: concurrency_sharded_WT
+  - name: replicasets_WT
+  - name: replication_WT
+  - name: sharding_WT
+  - name: slow1_WT
+  - name: slow2_WT
+  - name: sharding_jscore_passthrough_WT
+  - name: tool_WT
+  - name: ssl
+  - name: sslSpecial

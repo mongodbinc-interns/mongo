@@ -31,14 +31,8 @@
 namespace mongo {
 
 /**
- * This boolean is used as a master switch to enable and disable decimal support
- * at startup. It is a higher level abstraction above the server and shell options
- * so it is accessible from code that is shared between the two regardless of which
- * flags are present.
- *
- * For example, SpiderMonkey, which is required by both mongod and the shell
- * can use this boolean to check whether support is enabled.
+ * This boolean is used as a master switch and is set by the build configuration
  */
-extern bool enableExperimentalDecimalSupport;
+extern const bool experimentalDecimalSupport;
 
 }  // namespace mongo

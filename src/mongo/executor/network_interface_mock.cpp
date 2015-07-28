@@ -114,6 +114,16 @@ void NetworkInterfaceMock::cancelCommand(const TaskExecutor::CallbackHandle& cbH
     // No not-in-progress network command matched cbHandle.  Oh, well.
 }
 
+void NetworkInterfaceMock::setAlarm(const Date_t when, const stdx::function<void()>& action) {
+    stdx::unique_lock<stdx::mutex> lk(_mutex);
+    if (when <= _now_inlock()) {
+        lk.unlock();
+        action();
+        return;
+    }
+    _alarms.emplace(when, action);
+}
+
 void NetworkInterfaceMock::startup() {
     stdx::lock_guard<stdx::mutex> lk(_mutex);
     invariant(!_hasStarted);
@@ -242,6 +252,9 @@ void NetworkInterfaceMock::runUntil(Date_t until) {
             break;
         }
         Date_t newNow = _executorNextWakeupDate;
+        if (!_alarms.empty() && _alarms.top().when < newNow) {
+            newNow = _alarms.top().when;
+        }
         if (!_scheduled.empty() && _scheduled.front().getResponseDate() < newNow) {
             newNow = _scheduled.front().getResponseDate();
         }
@@ -277,6 +290,10 @@ void NetworkInterfaceMock::waitForWorkUntil(Date_t when) {
     _waitForWork_inlock(&lk);
 }
 
+void NetworkInterfaceMock::setConnectionHook(std::unique_ptr<ConnectionHook> hook) {
+    MONGO_UNREACHABLE;
+}
+
 void NetworkInterfaceMock::signalWorkAvailable() {
     stdx::lock_guard<stdx::mutex> lk(_mutex);
     _waitingToRunMask |= kExecutorThread;
@@ -286,6 +303,13 @@ void NetworkInterfaceMock::signalWorkAvailable() {
 }
 
 void NetworkInterfaceMock::_runReadyNetworkOperations_inlock(stdx::unique_lock<stdx::mutex>* lk) {
+    while (!_alarms.empty() && _now_inlock() >= _alarms.top().when) {
+        auto fn = _alarms.top().action;
+        _alarms.pop();
+        lk->unlock();
+        fn();
+        lk->lock();
+    }
     while (!_scheduled.empty() && _scheduled.front().getResponseDate() <= _now_inlock()) {
         invariant(_currentlyRunning == kNetworkThread);
         NetworkOperation op = _scheduled.front();

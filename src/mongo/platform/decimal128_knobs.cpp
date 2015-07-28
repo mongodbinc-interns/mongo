@@ -27,16 +27,16 @@
  */
 
 #include "mongo/platform/decimal128_knobs.h"
-#include "mongo/db/server_parameters.h"
+
+#include "mongo/config.h"
 
 namespace mongo {
 
-// Permit users to use decimal support flags only if they have built with the option enabled
-#if ENABLE_EXPERIMENTAL_DECIMAL_SUPPORT == 1
-// Set up enableExperimentalDecimalSupport parameter only on startup
-MONGO_EXPORT_STARTUP_SERVER_PARAMETER(enableExperimentalDecimalSupport, bool, false);
+// Check if we are building with experimental decimal support enabled
+#ifdef MONGO_CONFIG_EXPERIMENTAL_DECIMAL_SUPPORT
+const bool experimentalDecimalSupport = true;
 #else
-bool enableExperimentalDecimalSupport = false;
+const bool experimentalDecimalSupport = false;
 #endif
 
 }  // namespace mongo

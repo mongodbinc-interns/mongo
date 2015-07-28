@@ -33,7 +33,6 @@
 #include "mongo/platform/basic.h"
 
 #include "mongo/client/connpool.h"
-#include "mongo/client/parallel.h"
 #include "mongo/db/auth/action_set.h"
 #include "mongo/db/auth/action_type.h"
 #include "mongo/db/auth/authorization_manager.h"
@@ -453,7 +452,7 @@ public:
             return passthrough(conf, cmdObj, result);
         }
 
-        uassertStatusOK(grid.catalogManager()->dropCollection(txn, fullns));
+        uassertStatusOK(grid.catalogManager()->dropCollection(txn, NamespaceString(fullns)));
 
         if (!conf->removeSharding(fullns)) {
             warning() << "collection " << fullns

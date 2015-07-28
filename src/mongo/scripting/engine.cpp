@@ -87,6 +87,9 @@ void Scope::append(BSONObjBuilder& builder, const char* fieldName, const char* s
         case NumberLong:
             builder.append(fieldName, getNumberLongLong(scopeName));
             break;
+        case NumberDecimal:
+            builder.append(fieldName, getNumberDecimal(scopeName));
+            break;
         case String:
             builder.append(fieldName, getString(scopeName));
             break;
@@ -345,6 +348,12 @@ public:
         return std::shared_ptr<Scope>();
     }
 
+    void clear() {
+        stdx::lock_guard<stdx::mutex> lk(_mutex);
+
+        _pools.clear();
+    }
+
 private:
     struct ScopeAndPool {
         std::shared_ptr<Scope> scope;
@@ -362,6 +371,10 @@ private:
 
 ScopeCache scopeCache;
 }  // anonymous namespace
+
+void ScriptEngine::dropScopeCache() {
+    scopeCache.clear();
+}
 
 class PooledScope : public Scope {
 public:
@@ -417,6 +430,9 @@ public:
     }
     double getNumber(const char* field) {
         return _real->getNumber(field);
+    }
+    Decimal128 getNumberDecimal(const char* field) {
+        return _real->getNumberDecimal(field);
     }
     string getString(const char* field) {
         return _real->getString(field);

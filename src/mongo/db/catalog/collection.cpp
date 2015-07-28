@@ -152,8 +152,8 @@ Collection::Collection(OperationContext* txn,
       _indexCatalog(this),
       _validatorDoc(_details->getCollectionOptions(txn).validator.getOwned()),
       _validator(uassertStatusOK(parseValidator(_validatorDoc))),
-      _validationState(uassertStatusOK(
-          _parseValidationState(_details->getCollectionOptions(txn).validationState))),
+      _validationAction(uassertStatusOK(
+          _parseValidationAction(_details->getCollectionOptions(txn).validationAction))),
       _validationLevel(uassertStatusOK(
           _parseValidationLevel(_details->getCollectionOptions(txn).validationLevel))),
       _cursorManager(fullNS),
@@ -241,7 +241,7 @@ Status Collection::checkValidation(OperationContext* txn, const BSONObj& documen
     if (_validator->matchesBSON(document))
         return Status::OK();
 
-    if (_validationState == WARN) {
+    if (_validationAction == WARN) {
         warning() << "Document would fail validation"
                   << " collection: " << ns() << " doc: " << document;
         return Status::OK();
@@ -294,6 +294,13 @@ StatusWith<RecordId> Collection::insertDocument(OperationContext* txn,
 
     // we cannot call into the OpObserver here because the document being written is not present
     // fortunately, this is currently only used for adding entries to the oplog.
+
+    // If there is a notifier object and another thread is waiting on it, then we notify waiters
+    // of this document insert. Waiters keep a shared_ptr to '_cappedNotifier', so there are
+    // waiters if this Collection's shared_ptr is not unique.
+    if (_cappedNotifier && !_cappedNotifier.unique()) {
+        _cappedNotifier->notifyOfInsert();
+    }
 
     return StatusWith<RecordId>(loc);
 }
@@ -392,8 +399,6 @@ StatusWith<RecordId> Collection::_insertDocument(OperationContext* txn,
     invariant(RecordId::min() < loc.getValue());
     invariant(loc.getValue() < RecordId::max());
 
-    _infoCache.notifyOfWriteOp();
-
     Status s = _indexCatalog.indexRecord(txn, docToInsert, loc.getValue());
     if (!s.isOK())
         return StatusWith<RecordId>(s);
@@ -438,8 +443,6 @@ void Collection::deleteDocument(
     _indexCatalog.unindexRecord(txn, doc.value(), loc, noWarn);
 
     _recordStore->deleteRecord(txn, loc);
-
-    _infoCache.notifyOfWriteOp();
 
     if (!id.isEmpty()) {
         getGlobalServiceContext()->getOpObserver()->onDelete(txn, ns().ns(), id);
@@ -524,11 +527,7 @@ StatusWith<RecordId> Collection::updateDocument(OperationContext* txn,
     }
 
     // At this point, the old object may or may not still be indexed, depending on if it was
-    // moved.
-
-    _infoCache.notifyOfWriteOp();
-
-    // If the object did move, we need to add the new location to all indexes.
+    // moved. If the object did move, we need to add the new location to all indexes.
     if (newLocation.getValue() != oldLocation) {
         if (debug) {
             if (debug->nmoved == -1)  // default of -1 rather than 0
@@ -738,7 +737,7 @@ Status Collection::setValidator(OperationContext* txn, BSONObj validatorDoc) {
     if (!statusWithMatcher.isOK())
         return statusWithMatcher.getStatus();
 
-    _details->updateValidator(txn, validatorDoc, getValidationLevel(), getValidationState());
+    _details->updateValidator(txn, validatorDoc, getValidationLevel(), getValidationAction());
 
     _validator = std::move(statusWithMatcher.getValue());
     _validatorDoc = std::move(validatorDoc);
@@ -761,17 +760,17 @@ StatusWith<Collection::ValidationLevel> Collection::_parseValidationLevel(String
     }
 }
 
-StatusWith<Collection::ValidationState> Collection::_parseValidationState(StringData newState) {
-    if (newState == "") {
+StatusWith<Collection::ValidationAction> Collection::_parseValidationAction(StringData newAction) {
+    if (newAction == "") {
         // default
-        return ENFORCE;
-    } else if (newState == "warn") {
+        return ERROR;
+    } else if (newAction == "warn") {
         return WARN;
-    } else if (newState == "enforce") {
-        return ENFORCE;
+    } else if (newAction == "error") {
+        return ERROR;
     } else {
         return Status(ErrorCodes::BadValue,
-                      str::stream() << "invalid validation state: " << newState);
+                      str::stream() << "invalid validation action: " << newAction);
     }
 }
 
@@ -787,10 +786,10 @@ StringData Collection::getValidationLevel() const {
     MONGO_UNREACHABLE;
 }
 
-StringData Collection::getValidationState() const {
-    switch (_validationState) {
-        case ENFORCE:
-            return "enforce";
+StringData Collection::getValidationAction() const {
+    switch (_validationAction) {
+        case ERROR:
+            return "error";
         case WARN:
             return "warn";
     }
@@ -807,22 +806,22 @@ Status Collection::setValidationLevel(OperationContext* txn, StringData newLevel
 
     _validationLevel = status.getValue();
 
-    _details->updateValidator(txn, _validatorDoc, getValidationLevel(), getValidationState());
+    _details->updateValidator(txn, _validatorDoc, getValidationLevel(), getValidationAction());
 
     return Status::OK();
 }
 
-Status Collection::setValidationState(OperationContext* txn, StringData newState) {
+Status Collection::setValidationAction(OperationContext* txn, StringData newAction) {
     invariant(txn->lockState()->isCollectionLockedForMode(ns().toString(), MODE_X));
 
-    StatusWith<ValidationState> status = _parseValidationState(newState);
+    StatusWith<ValidationAction> status = _parseValidationAction(newAction);
     if (!status.isOK()) {
         return status.getStatus();
     }
 
-    _validationState = status.getValue();
+    _validationAction = status.getValue();
 
-    _details->updateValidator(txn, _validatorDoc, getValidationLevel(), getValidationState());
+    _details->updateValidator(txn, _validatorDoc, getValidationLevel(), getValidationAction());
 
     return Status::OK();
 }

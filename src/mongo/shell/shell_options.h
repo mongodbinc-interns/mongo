@@ -72,8 +72,6 @@ struct ShellGlobalParams {
 
     boost::optional<rpc::ProtocolSet> rpcProtocols;
 
-    bool enableExperimentalDecimalSupport;
-
     ShellGlobalParams()
         : autoKillOp(false),
           useWriteCommandsDefault(true),

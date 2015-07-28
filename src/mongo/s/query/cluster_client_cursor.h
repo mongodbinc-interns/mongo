@@ -30,13 +30,12 @@
 
 #include <boost/optional.hpp>
 
-#include "mongo/base/status_with.h"
-#include "mongo/executor/task_executor.h"
-#include "mongo/s/query/cluster_client_cursor_params.h"
-#include "mongo/s/query/async_cluster_client_cursor.h"
-#include "mongo/util/net/hostandport.h"
+#include "mongo/db/jsobj.h"
 
 namespace mongo {
+
+template <typename T>
+class StatusWith;
 
 /**
  * ClusterClientCursor is used to generate results from cursor-generating commands on one or
@@ -45,19 +44,13 @@ namespace mongo {
  * all command results, getMores must be issued against each of the remote cursors until they
  * are exhausted.
  *
- * ClusterClientCursor provides a simple blocking interface wrapping AsyncClientCursor's
- * non-blocking interface.
+ * Results are generated using a pipeline of mongoS query execution stages called RouterExecStage.
  *
  * Does not throw exceptions.
  */
 class ClusterClientCursor {
 public:
-    /**
-     * Constructs a cluster client cursor.
-     */
-    ClusterClientCursor(executor::TaskExecutor* executor,
-                        const ClusterClientCursorParams& params,
-                        const std::vector<HostAndPort>& remotes);
+    virtual ~ClusterClientCursor(){};
 
     /**
      * Returns the next available result document (along with an ok status). May block waiting
@@ -68,7 +61,7 @@ public:
      *
      * A non-ok status is returned in case of any error.
      */
-    StatusWith<boost::optional<BSONObj>> next();
+    virtual StatusWith<boost::optional<BSONObj>> next() = 0;
 
     /**
      * Must be called before destruction to abandon a not-yet-exhausted cursor. If next() has
@@ -76,16 +69,7 @@ public:
      *
      * May block waiting for responses from remote hosts.
      */
-    void kill();
-
-private:
-    // Not owned here.
-    executor::TaskExecutor* _executor;
-
-    const ClusterClientCursorParams _params;
-
-    // Does work of scheduling remote work and merging results.
-    AsyncClusterClientCursor _accc;
+    virtual void kill() = 0;
 };
 
 }  // namespace mongo

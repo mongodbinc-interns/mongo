@@ -37,6 +37,8 @@
 
 #include "mongo/base/error_codes.h"
 #include "mongo/db/operation_context.h"
+#include "mongo/platform/decimal128.h"
+#include "mongo/platform/decimal128_knobs.h"
 #include "mongo/scripting/mozjs/objectwrapper.h"
 #include "mongo/scripting/mozjs/valuereader.h"
 #include "mongo/scripting/mozjs/valuewriter.h"
@@ -101,11 +103,23 @@ void MozJSImplScope::_reportError(JSContext* cx, const char* message, JSErrorRep
     auto scope = getScope(cx);
 
     if (!JSREPORT_IS_WARNING(report->flags)) {
+        str::stream ss;
+        ss << message;
+
+        // TODO: something far more elaborate that mimics the stack printing from v8
+        JS::RootedValue excn(cx);
+        if (JS_GetPendingException(cx, &excn) && excn.isObject()) {
+            JS::RootedValue stack(cx);
+
+            ObjectWrapper(cx, excn).getValue("stack", &stack);
+
+            ss << " :\n" << ValueWriter(cx, stack).toString();
+        }
+
         scope->_status =
             Status(report->errorNumber ? static_cast<ErrorCodes::Error>(report->errorNumber)
                                        : ErrorCodes::JSInterpreterFailure,
-                   str::stream() << message << ":\n"
-                                 << JS::FormatStackDump(cx, nullptr, true, true, false) << "\n");
+                   ss);
     }
 }
 
@@ -145,7 +159,10 @@ bool MozJSImplScope::_interruptCallback(JSContext* cx) {
     auto scope = getScope(cx);
 
     if (scope->_pendingGC.load()) {
+        scope->_pendingGC.store(false);
         JS_GC(scope->_runtime);
+    } else {
+        JS_MaybeGC(cx);
     }
 
     bool kill = scope->isKillPending();
@@ -229,6 +246,7 @@ MozJSImplScope::MozJSImplScope(MozJSScriptEngine* engine)
       _nativeFunctionProto(_context),
       _numberIntProto(_context),
       _numberLongProto(_context),
+      _numberDecimalProto(_context),
       _objectProto(_context),
       _oidProto(_context),
       _regExpProto(_context),
@@ -338,6 +356,12 @@ long long MozJSImplScope::getNumberLongLong(const char* field) {
     MozJSEntry entry(this);
 
     return ObjectWrapper(_context, _global).getNumberLongLong(field);
+}
+
+Decimal128 MozJSImplScope::getNumberDecimal(const char* field) {
+    MozJSEntry entry(this);
+
+    return ObjectWrapper(_context, _global).getNumberDecimal(field);
 }
 
 std::string MozJSImplScope::getString(const char* field) {
@@ -540,6 +564,7 @@ bool MozJSImplScope::exec(StringData code,
 
     JS::CompileOptions co(_context);
     setCompileOptions(&co);
+    co.setFile(name.c_str());
     JS::RootedScript script(_context);
 
     bool success = JS::Compile(_context, _global, co, code.rawData(), code.size(), &script);
@@ -665,6 +690,9 @@ void MozJSImplScope::installBSONTypes() {
     _nativeFunctionProto.install(_global);
     _numberIntProto.install(_global);
     _numberLongProto.install(_global);
+    if (experimentalDecimalSupport) {
+        _numberDecimalProto.install(_global);
+    }
     _objectProto.install(_global);
     _oidProto.install(_global);
     _regExpProto.install(_global);

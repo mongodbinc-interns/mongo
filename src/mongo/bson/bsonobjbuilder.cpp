@@ -48,6 +48,9 @@ void BSONObjBuilder::appendMinForType(StringData fieldName, int t) {
         case NumberLong:
             append(fieldName, -std::numeric_limits<double>::max());
             return;
+        case NumberDecimal:
+            append(fieldName, Decimal128::kNegativeInfinity);
+            return;
         case Symbol:
         case String:
             append(fieldName, "");
@@ -118,6 +121,9 @@ void BSONObjBuilder::appendMaxForType(StringData fieldName, int t) {
         case NumberLong:
             append(fieldName, std::numeric_limits<double>::max());
             return;
+        case NumberDecimal:
+            append(fieldName, Decimal128::kPositiveInfinity);
+            return;
         case Symbol:
         case String:
             appendMinForType(fieldName, Object);
@@ -176,51 +182,6 @@ void BSONObjBuilder::appendMaxForType(StringData fieldName, int t) {
     }
     log() << "type not supported for appendMaxElementForType: " << t;
     uassert(14853, "type not supported for appendMaxElementForType", false);
-}
-
-
-bool BSONObjBuilder::appendAsNumber(StringData fieldName, const string& data) {
-    if (data.size() == 0 || data == "-" || data == ".")
-        return false;
-
-    unsigned int pos = 0;
-    if (data[0] == '-')
-        pos++;
-
-    bool hasDec = false;
-
-    for (; pos < data.size(); pos++) {
-        if (isdigit(data[pos]))
-            continue;
-
-        if (data[pos] == '.') {
-            if (hasDec)
-                return false;
-            hasDec = true;
-            continue;
-        }
-
-        return false;
-    }
-
-    if (hasDec) {
-        double d = atof(data.c_str());
-        append(fieldName, d);
-        return true;
-    }
-
-    if (data.size() < 8) {
-        append(fieldName, atoi(data.c_str()));
-        return true;
-    }
-
-    try {
-        long long num = boost::lexical_cast<long long>(data);
-        append(fieldName, num);
-        return true;
-    } catch (boost::bad_lexical_cast&) {
-        return false;
-    }
 }
 
 BSONObjBuilder& BSONObjBuilder::appendDate(StringData fieldName, Date_t dt) {

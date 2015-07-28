@@ -138,21 +138,26 @@ StatusWith<OID> extractElectionId(const BSONObj& responseObj) {
 
 }  // unnamed namespace
 
-DistLockCatalogImpl::DistLockCatalogImpl(RemoteCommandTargeter* targeter,
-                                         ShardRegistry* shardRegistry,
+DistLockCatalogImpl::DistLockCatalogImpl(ShardRegistry* shardRegistry,
                                          Milliseconds writeConcernTimeout)
     : _client(shardRegistry),
-      _targeter(targeter),
       _writeConcern(WriteConcernOptions(WriteConcernOptions::kMajority,
-                                        WriteConcernOptions::JOURNAL,
+                                        // Note: Even though we're setting NONE here,
+                                        // kMajority implies JOURNAL, if journaling is supported
+                                        // by this mongod.
+                                        WriteConcernOptions::NONE,
                                         writeConcernTimeout.count())),
       _lockPingNS(LockpingsType::ConfigNS),
       _locksNS(LocksType::ConfigNS) {}
 
 DistLockCatalogImpl::~DistLockCatalogImpl() = default;
 
+RemoteCommandTargeter* DistLockCatalogImpl::_targeter() {
+    return _client->getShard("config")->getTargeter();
+}
+
 StatusWith<LockpingsType> DistLockCatalogImpl::getPing(StringData processID) {
-    auto targetStatus = _targeter->findHost(kReadPref);
+    auto targetStatus = _targeter()->findHost(kReadPref);
 
     if (!targetStatus.isOK()) {
         return targetStatus.getStatus();
@@ -187,7 +192,7 @@ StatusWith<LockpingsType> DistLockCatalogImpl::getPing(StringData processID) {
 }
 
 Status DistLockCatalogImpl::ping(StringData processID, Date_t ping) {
-    auto targetStatus = _targeter->findHost(kReadPref);
+    auto targetStatus = _targeter()->findHost(kReadPref);
 
     if (!targetStatus.isOK()) {
         return targetStatus.getStatus();
@@ -225,7 +230,7 @@ StatusWith<LocksType> DistLockCatalogImpl::grabLock(StringData lockID,
                                                     StringData processId,
                                                     Date_t time,
                                                     StringData why) {
-    auto targetStatus = _targeter->findHost(kReadPref);
+    auto targetStatus = _targeter()->findHost(kReadPref);
 
     if (!targetStatus.isOK()) {
         return targetStatus.getStatus();
@@ -282,7 +287,7 @@ StatusWith<LocksType> DistLockCatalogImpl::overtakeLock(StringData lockID,
                                                         StringData processId,
                                                         Date_t time,
                                                         StringData why) {
-    auto targetStatus = _targeter->findHost(kReadPref);
+    auto targetStatus = _targeter()->findHost(kReadPref);
 
     if (!targetStatus.isOK()) {
         return targetStatus.getStatus();
@@ -329,7 +334,7 @@ StatusWith<LocksType> DistLockCatalogImpl::overtakeLock(StringData lockID,
 }
 
 Status DistLockCatalogImpl::unlock(const OID& lockSessionID) {
-    auto targetStatus = _targeter->findHost(kReadPref);
+    auto targetStatus = _targeter()->findHost(kReadPref);
 
     if (!targetStatus.isOK()) {
         return targetStatus.getStatus();
@@ -363,7 +368,7 @@ Status DistLockCatalogImpl::unlock(const OID& lockSessionID) {
 }
 
 StatusWith<DistLockCatalog::ServerInfo> DistLockCatalogImpl::getServerInfo() {
-    auto targetStatus = _targeter->findHost(kReadPref);
+    auto targetStatus = _targeter()->findHost(kReadPref);
 
     if (!targetStatus.isOK()) {
         return targetStatus.getStatus();
@@ -402,7 +407,7 @@ StatusWith<DistLockCatalog::ServerInfo> DistLockCatalogImpl::getServerInfo() {
 }
 
 StatusWith<LocksType> DistLockCatalogImpl::getLockByTS(const OID& lockSessionID) {
-    auto targetStatus = _targeter->findHost(kReadPref);
+    auto targetStatus = _targeter()->findHost(kReadPref);
 
     if (!targetStatus.isOK()) {
         return targetStatus.getStatus();
@@ -434,7 +439,7 @@ StatusWith<LocksType> DistLockCatalogImpl::getLockByTS(const OID& lockSessionID)
 }
 
 StatusWith<LocksType> DistLockCatalogImpl::getLockByName(StringData name) {
-    auto targetStatus = _targeter->findHost(kReadPref);
+    auto targetStatus = _targeter()->findHost(kReadPref);
 
     if (!targetStatus.isOK()) {
         return targetStatus.getStatus();
@@ -466,7 +471,7 @@ StatusWith<LocksType> DistLockCatalogImpl::getLockByName(StringData name) {
 }
 
 Status DistLockCatalogImpl::stopPing(StringData processId) {
-    auto targetStatus = _targeter->findHost(kReadPref);
+    auto targetStatus = _targeter()->findHost(kReadPref);
 
     if (!targetStatus.isOK()) {
         return targetStatus.getStatus();

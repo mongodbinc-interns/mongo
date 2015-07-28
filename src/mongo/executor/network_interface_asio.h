@@ -28,26 +28,59 @@
 
 #pragma once
 
+#include "mongo/config.h"
+
 #include <asio.hpp>
+
 #include <boost/optional.hpp>
 #include <memory>
 #include <string>
 #include <system_error>
 #include <unordered_map>
 
+#ifdef MONGO_CONFIG_SSL
+#include <asio/ssl.hpp>
+#endif
+
 #include "mongo/base/status.h"
 #include "mongo/client/connection_pool.h"
-#include "mongo/client/remote_command_runner.h"
 #include "mongo/executor/network_interface.h"
+#include "mongo/executor/remote_command_request.h"
+#include "mongo/executor/remote_command_response.h"
 #include "mongo/platform/atomic_word.h"
 #include "mongo/rpc/protocol.h"
 #include "mongo/stdx/condition_variable.h"
+#include "mongo/stdx/functional.h"
 #include "mongo/stdx/mutex.h"
 #include "mongo/stdx/thread.h"
 #include "mongo/util/net/message.h"
 
 namespace mongo {
 namespace executor {
+
+/**
+ * A two-way stream supporting asynchronous reads and writes.
+ */
+class AsyncStreamInterface {
+    MONGO_DISALLOW_COPYING(AsyncStreamInterface);
+
+public:
+    virtual ~AsyncStreamInterface() = default;
+
+    using ConnectHandler = stdx::function<void(std::error_code)>;
+
+    using StreamHandler = stdx::function<void(std::error_code, std::size_t)>;
+
+    virtual void connect(const asio::ip::tcp::resolver::iterator endpoints,
+                         ConnectHandler&& connectHandler) = 0;
+
+    virtual void write(asio::const_buffer buf, StreamHandler&& writeHandler) = 0;
+
+    virtual void read(asio::mutable_buffer buf, StreamHandler&& readHandler) = 0;
+
+protected:
+    AsyncStreamInterface() = default;
+};
 
 /**
  * Implementation of the replication system's network interface using Christopher
@@ -62,36 +95,43 @@ public:
     void shutdown() override;
     void waitForWork() override;
     void waitForWorkUntil(Date_t when) override;
+    void setConnectionHook(std::unique_ptr<ConnectionHook> hook) override;
     void signalWorkAvailable() override;
     Date_t now() override;
     void startCommand(const TaskExecutor::CallbackHandle& cbHandle,
                       const RemoteCommandRequest& request,
                       const RemoteCommandCompletionFn& onFinish) override;
     void cancelCommand(const TaskExecutor::CallbackHandle& cbHandle) override;
+    void setAlarm(Date_t when, const stdx::function<void()>& action) override;
 
     bool inShutdown() const;
 
 private:
     using ResponseStatus = TaskExecutor::ResponseStatus;
     using NetworkInterface::RemoteCommandCompletionFn;
+    using NetworkOpHandler = stdx::function<void(std::error_code, size_t)>;
 
     enum class State { kReady, kRunning, kShutdown };
+
+    class AsyncStream;
+    class AsyncSecureStream;
 
     /**
      * AsyncConnection encapsulates the per-connection state we maintain.
      */
     class AsyncConnection {
     public:
-        AsyncConnection(asio::ip::tcp::socket&& sock, rpc::ProtocolSet serverProtocols);
+        AsyncConnection(std::unique_ptr<AsyncStreamInterface>, rpc::ProtocolSet serverProtocols);
 
-        AsyncConnection(asio::ip::tcp::socket&& sock,
+        AsyncConnection(std::unique_ptr<AsyncStreamInterface>,
                         rpc::ProtocolSet serverProtocols,
                         boost::optional<ConnectionPool::ConnectionPtr>&& bootstrapConn);
 
-        asio::ip::tcp::socket& sock();
+        AsyncStreamInterface& stream();
 
         rpc::ProtocolSet serverProtocols() const;
         rpc::ProtocolSet clientProtocols() const;
+        void setServerProtocols(rpc::ProtocolSet protocols);
 
 // Explicit move construction and assignment to support MSVC
 #if defined(_MSC_VER) && _MSC_VER < 1900
@@ -103,7 +143,7 @@ private:
 #endif
 
     private:
-        asio::ip::tcp::socket _sock;
+        std::unique_ptr<AsyncStreamInterface> _stream;
 
         rpc::ProtocolSet _serverProtocols;
         rpc::ProtocolSet _clientProtocols{rpc::supports::kAll};
@@ -117,6 +157,35 @@ private:
     };
 
     /**
+     * AsyncCommand holds state for a currently running or soon-to-be-run command.
+     */
+    class AsyncCommand {
+    public:
+        AsyncCommand(AsyncConnection* conn);
+
+        // This method resets the Messages and associated information held inside
+        // an AsyncCommand so that it may be reused to run a new network roundtrip.
+        void reset();
+
+        NetworkInterfaceASIO::AsyncConnection& conn();
+
+        Message& toSend();
+        void setToSend(Message&& message);
+
+        Message& toRecv();
+        MSGHEADER::Value& header();
+
+    private:
+        NetworkInterfaceASIO::AsyncConnection* const _conn;
+
+        Message _toSend;
+        Message _toRecv;
+
+        // TODO: Investigate efficiency of storing header separately.
+        MSGHEADER::Value _header;
+    };
+
+    /**
      * Helper object to manage individual network operations.
      */
     class AsyncOp {
@@ -124,50 +193,36 @@ private:
         AsyncOp(const TaskExecutor::CallbackHandle& cbHandle,
                 const RemoteCommandRequest& request,
                 const RemoteCommandCompletionFn& onFinish,
-                Date_t now,
-                int id);
-
-        std::string toString() const;
+                Date_t now);
 
         void cancel();
         bool canceled() const;
 
         const TaskExecutor::CallbackHandle& cbHandle() const;
 
-        AsyncConnection* connection();
+        AsyncConnection& connection();
 
-        void connect(ConnectionPool* const pool, asio::io_service* service, Date_t now);
         void setConnection(AsyncConnection&& conn);
-        bool connected() const;
+
+        // AsyncOp may run multiple commands over its lifetime (for example, an ismaster
+        // command, the command provided to the NetworkInterface via startCommand(), etc.)
+        // Calling beginCommand() resets internal state to prepare to run newCommand.
+        AsyncCommand& beginCommand(Message&& newCommand);
+        AsyncCommand& command();
 
         void finish(const TaskExecutor::ResponseStatus& status);
-
-        MSGHEADER::Value* header();
 
         const RemoteCommandRequest& request() const;
 
         Date_t start() const;
-
-        Message* toSend();
-
-        void setToSend(Message&& message);
-
-        Message* toRecv();
 
         rpc::Protocol operationProtocol() const;
 
         void setOperationProtocol(rpc::Protocol proto);
 
     private:
-        enum class OpState {
-            kReady,
-            kConnectionAcquired,
-            kConnectionVerified,
-            kConnected,
-            kCompleted
-        };
-
-        // Information describing an in-flight command.
+        // Information describing a task enqueued on the NetworkInterface
+        // via a call to startCommand().
         TaskExecutor::CallbackHandle _cbHandle;
         RemoteCommandRequest _request;
         RemoteCommandCompletionFn _onFinish;
@@ -186,21 +241,17 @@ private:
 
         const Date_t _start;
 
-        OpState _state;
         AtomicUInt64 _canceled;
 
         /**
-         * The outgoing command associated with this operation.
+         * An AsyncOp may run 0, 1, or multiple commands over its lifetime.
+         * AsyncOp only holds at most a single AsyncCommand object at a time,
+         * representing its current running or next-to-be-run command, if there is one.
          */
-        boost::optional<Message> _toSend;
-
-        Message _toRecv;
-        MSGHEADER::Value _header;
-
-        const int _id;
+        boost::optional<AsyncCommand> _command;
     };
 
-    void _asyncRunCommand(AsyncOp* op);
+    void _startCommand(AsyncOp* op);
 
     /**
      * Wraps a completion handler in pre-condition checks.
@@ -224,27 +275,30 @@ private:
     std::unique_ptr<Message> _messageFromRequest(const RemoteCommandRequest& request,
                                                  rpc::Protocol protocol);
 
-    void _asyncSendSimpleMessage(AsyncOp* op, const asio::const_buffer& buf);
-
     // Connection
     void _connectASIO(AsyncOp* op);
     void _connectWithDBClientConnection(AsyncOp* op);
-    void _setupSocket(AsyncOp* op, const asio::ip::tcp::resolver::iterator& endpoints);
+
+    // setup plaintext TCP socket
+    void _setupSocket(AsyncOp* op, const asio::ip::tcp::resolver::iterator endpoints);
+
+#ifdef MONGO_CONFIG_SSL
+    // setup SSL socket
+    void _setupSecureSocket(AsyncOp* op, asio::ip::tcp::resolver::iterator endpoints);
+#endif
+
+    void _runIsMaster(AsyncOp* op);
     void _authenticate(AsyncOp* op);
-    void _sslHandshake(AsyncOp* op);
 
     // Communication state machine
     void _beginCommunication(AsyncOp* op);
-    void _completedWriteCallback(AsyncOp* op);
+    void _completedOpCallback(AsyncOp* op);
     void _networkErrorCallback(AsyncOp* op, const std::error_code& ec);
-
     void _completeOperation(AsyncOp* op, const TaskExecutor::ResponseStatus& resp);
 
-    void _recvMessageHeader(AsyncOp* op);
-    void _recvMessageBody(AsyncOp* op);
-    void _receiveResponse(AsyncOp* op);
-
     void _signalWorkAvailable_inlock();
+
+    void _asyncRunCommand(AsyncCommand* cmd, NetworkOpHandler handler);
 
     asio::io_service _io_service;
     stdx::thread _serviceRunner;
@@ -262,7 +316,12 @@ private:
 
     std::unique_ptr<ConnectionPool> _connPool;
 
-    AtomicUInt64 _numOps;
+#ifdef MONGO_CONFIG_SSL
+    // The SSL context. This declaration is wrapped in an ifdef because the asio::ssl::context
+    // type does not exist unless SSL support is compiled in. We also use a boost::optional as
+    // even if SSL support is compiled in, it can be disabled at runtime.
+    boost::optional<asio::ssl::context> _sslContext;
+#endif
 };
 
 }  // namespace executor

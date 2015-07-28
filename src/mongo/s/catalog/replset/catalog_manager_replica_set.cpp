@@ -82,12 +82,10 @@ using str::stream;
 
 namespace {
 
-const Status notYetImplemented(ErrorCodes::InternalError, "Not yet implemented");  // todo remove
-
-// Until read committed is supported always write to the primary with majoirty write and read
+// Until read committed is supported always write to the primary with majority write and read
 // from the secondary. That way we ensure that reads will see a consistent data.
 const ReadPreferenceSetting kConfigWriteSelector(ReadPreference::PrimaryOnly, TagSet{});
-const ReadPreferenceSetting kConfigReadSelector(ReadPreference::SecondaryOnly, TagSet{});
+const ReadPreferenceSetting kConfigReadSelector(ReadPreference::SecondaryPreferred, TagSet{});
 
 const int kNotMasterNumRetries = 3;
 const int kInitialSSVRetries = 3;
@@ -436,11 +434,6 @@ Status CatalogManagerReplicaSet::getCollections(const std::string* dbName,
     return Status::OK();
 }
 
-Status CatalogManagerReplicaSet::dropCollection(OperationContext* txn,
-                                                const std::string& collectionNs) {
-    return notYetImplemented;
-}
-
 void CatalogManagerReplicaSet::logAction(const ActionLogType& actionLog) {
     if (_actionLogCollectionCreated.load() == 0) {
         BSONObj createCmd = BSON("create" << ActionLogType::ConfigNS << "capped" << true << "size"
@@ -717,10 +710,6 @@ Status CatalogManagerReplicaSet::getAllShards(vector<ShardType>* shards) {
     return Status::OK();
 }
 
-bool CatalogManagerReplicaSet::isShardHost(const ConnectionString& connectionString) {
-    return false;
-}
-
 bool CatalogManagerReplicaSet::runUserManagementWriteCommand(const std::string& commandName,
                                                              const std::string& dbname,
                                                              const BSONObj& cmdObj,
@@ -895,7 +884,7 @@ StatusWith<std::string> CatalogManagerReplicaSet::_generateNewShardName() const 
     }
 
     BSONObjBuilder shardNameRegex;
-    shardNameRegex.appendRegex(ShardType::name(), "/^shard/");
+    shardNameRegex.appendRegex(ShardType::name(), "^shard");
 
     auto findStatus = grid.shardRegistry()->exhaustiveFind(readHost.getValue(),
                                                            NamespaceString(ShardType::ConfigNS),

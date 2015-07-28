@@ -41,6 +41,8 @@ DBQuery.prototype.help = function () {
     print("\t.max(idxDoc)")
     print("\t.comment(comment)")
     print("\t.snapshot()")
+    print("\t.returnKey()")
+    print("\t.maxScan(n)")
     print("\t.readPref(mode, tagset)")
     
     print("\nCursor methods");
@@ -147,7 +149,7 @@ DBQuery.prototype._convertToCommand = function() {
         }
     }
 
-    if (this._query.orderby) {
+    if ("orderby" in this._query) {
         cmd["sort"] = this._query.orderby;
     }
 
@@ -155,43 +157,43 @@ DBQuery.prototype._convertToCommand = function() {
         cmd["projection"] = this._fields;
     }
 
-    if (this._query.$hint) {
+    if ("$hint" in this._query) {
         cmd["hint"] = this._query.$hint;
     }
 
-    if (this._query.$readPreference) {
+    if ("$readPreference" in this._query) {
        cmd["$readPreference"] = this._query.$readPreference;
     }
 
-    if (this._query.$comment) {
+    if ("$comment" in this._query) {
         cmd["comment"] = this._query.$comment;
     }
 
-    if (this._query.$maxScan) {
+    if ("$maxScan" in this._query) {
         cmd["maxScan"] = this._query.$maxScan;
     }
 
-    if (this._query.$maxTimeMS) {
+    if ("$maxTimeMS" in this._query) {
         cmd["maxTimeMS"] = this._query.$maxTimeMS;
     }
 
-    if (this._query.$max) {
+    if ("$max" in this._query) {
         cmd["max"] = this._query.$max;
     }
 
-    if (this._query.$min) {
+    if ("$min" in this._query) {
         cmd["min"] = this._query.$min;
     }
 
-    if (this._query.$returnKey) {
+    if ("$returnKey" in this._query) {
         cmd["returnKey"] = this._query.$returnKey;
     }
 
-    if (this._query.$showDiskLoc) {
+    if ("$showDiskLoc" in this._query) {
         cmd["showRecordId"] = this._query.$showDiskLoc;
     }
 
-    if (this._query.$snapshot) {
+    if ("$snapshot" in this._query) {
         cmd["snapshot"] = this._query.$snapshot;
     }
 
@@ -265,8 +267,9 @@ DBQuery.prototype.next = function(){
         throw Error( "error hasNext: " + o );
     
     var ret = this._cursor.next();
-    if ( ret.$err )
-        throw Error( "error: " + tojson( ret ) );
+    if ( ret.$err ) {
+        throw _getErrorWithCode(ret, "error: " + tojson( ret ));
+    }
 
     this._numReturned++;
     return ret;
@@ -277,7 +280,7 @@ DBQuery.prototype.objsLeftInBatch = function(){
 
     var ret = this._cursor.objsLeftInBatch();
     if ( ret.$err )
-        throw Error( "error: " + tojson( ret ) );
+        throw _getErrorWithCode(ret,  "error: " + tojson( ret ));
 
     return ret;
 }
@@ -333,7 +336,7 @@ DBQuery.prototype.count = function( applySkipLimit ) {
 
     var res = this._db.runCommand( cmd );
     if( res && res.n != null ) return res.n;
-    throw Error( "count failed: " + tojson( res ) );
+    throw _getErrorWithCode(res, "count failed: " + tojson( res ));
 }
 
 DBQuery.prototype.size = function(){
@@ -360,6 +363,15 @@ DBQuery.prototype.itcount = function(){
     while ( this.hasNext() ){
         num++;
         this.next();
+
+        // This function can be called with some very large cursors.
+        // SpiderMonkey appears happy to allow these objects to accumulate, so
+        // regular gc() avoids an overly large memory footprint.
+        //
+        // TODO: migrate this function into c++
+        if (num % 10000 == 0) {
+            gc();
+        }
     }
     return num;
 }
@@ -453,6 +465,14 @@ DBQuery.prototype.explain = function (verbose) {
 
 DBQuery.prototype.snapshot = function(){
     return this._addSpecial( "$snapshot" , true );
+}
+
+DBQuery.prototype.returnKey = function(){
+    return this._addSpecial( "$returnKey" , true );
+}
+
+DBQuery.prototype.maxScan = function(n){
+    return this._addSpecial( "$maxScan" , n );
 }
 
 DBQuery.prototype.pretty = function(){
@@ -609,7 +629,7 @@ DBCommandCursor.prototype.next = function() {
 
         var ret = this._cursor.next();
         if ( ret.$err )
-            throw Error( "error: " + tojson( ret ) );
+            throw _getErrorWithCode(ret, "error: " + tojson(ret));
         return ret;
     }
 }
