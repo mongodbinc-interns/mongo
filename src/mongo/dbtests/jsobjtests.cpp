@@ -722,7 +722,7 @@ struct AppendNumber {
         ASSERT(o["d"].type() == NumberDouble);
         ASSERT(o["e"].type() == NumberLong);
 
-        if (experimentalDecimalSupport) { 
+        if (experimentalDecimalSupport) {
             b.appendNumber("f", mongo::Decimal128("1"));
             ASSERT(o["f"].type() == NumberDecimal);
         }
