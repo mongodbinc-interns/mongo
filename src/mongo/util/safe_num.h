@@ -177,7 +177,7 @@ private:
     BSONType _type;
 
     // Value of the safe num. Indeterminate if _type is EOO.
-    union SafeNumValue {
+    union {
         int int32Val;
         long long int int64Val;
         double doubleVal;
