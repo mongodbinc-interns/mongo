@@ -33,7 +33,6 @@
 #include "mongo/bson/bsontypes.h"
 #include "mongo/bson/bsonobj.h"
 #include "mongo/platform/decimal128.h"
-#include "mongo/platform/decimal128_knobs.h"
 #include "mongo/util/safe_num.h"
 #include "mongo/unittest/unittest.h"
 
@@ -103,10 +102,12 @@ TEST(Comparison, StrictTypeComparison) {
     ASSERT_FALSE(one.isIdentical(oneLong));
     ASSERT_FALSE(oneLong.isIdentical(oneDouble));
     ASSERT_FALSE(oneDouble.isIdentical(one));
+    ASSERT_TRUE(oneDouble.isIdentical(oneDouble));
 
     if (mongo::experimentalDecimalSupport) {
         const SafeNum oneDecimal(Decimal128(1));
         ASSERT_FALSE(oneDecimal.isIdentical(one));
+        ASSERT_TRUE(oneDecimal.isIdentical(oneDecimal));
     }
 }
 

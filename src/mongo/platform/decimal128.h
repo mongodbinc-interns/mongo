@@ -1,4 +1,4 @@
-/*    Copyright 2014 MongoDB Inc.
+/*    Copyright 2015 MongoDB Inc.
  *
  *    This program is free software: you can redistribute it and/or  modify
  *    it under the terms of the GNU Affero General Public License, version 3,
@@ -35,6 +35,16 @@
 #include "mongo/config.h"
 
 namespace mongo {
+
+/**
+ * This boolean is used as a master switch to enable and disable decimal support
+ * and is set by the build flag --experimental-decimal-support.
+ */
+#ifdef MONGO_CONFIG_EXPERIMENTAL_DECIMAL_SUPPORT
+const bool experimentalDecimalSupport = true;
+#else
+const bool experimentalDecimalSupport = false;
+#endif
 
 /**
  * Wrapper class for the MongoDB Decimal128 data type. Sample usage:
@@ -160,13 +170,12 @@ public:
     Decimal128(std::string stringValue, RoundingMode roundMode = kRoundTiesToEven);
 
     /**
-     * These functions get the inner Decimal128Value struct storing the decimal128 value.
-     * Const cast away for the mutable version of the function.
+     * This function gets the inner Decimal128Value struct storing a Decimal128 value.
      */
     Decimal128Value getValue() const;
 
     /**
-     * This function returns the decimal absolute value of the caller
+     * This function returns the decimal absolute value of the caller.
      */
     Decimal128 toAbs() const;
 

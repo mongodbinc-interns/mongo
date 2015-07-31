@@ -6,7 +6,6 @@ lib_deps = [
     '$BUILD_DIR/mongo/base',
 ]
 source_files = [
-    'decimal128_knobs.cpp',
     'posix_fadvise.cpp',
     'process_id.cpp',
     "shared_library.cpp",
@@ -20,8 +19,7 @@ if GetOption('experimental-decimal-support') == 'on':
 else:
     source_files.append('decimal128_dummy.cpp')
 
-env.Library('platform', source_files,
-        LIBDEPS=lib_deps)
+env.Library('platform', source_files, LIBDEPS=lib_deps)
 
 env.CppUnitTest('atomic_word_test', 'atomic_word_test.cpp')
 env.CppUnitTest('bits_test', 'bits_test.cpp')
