@@ -27,6 +27,7 @@
     // NaNs
     assert.eq(col.find({ "decimal" : NumberDecimal("NaN") }).count(), 2, "NaN find failed");
 
+    var theNaNs = col.find({ "decimal" : NumberDecimal("NaN") }, { "_id" : 0 });
     assert(bsonWoCompare(theNaNs[0], theNaNs[1]) == 0, "NaN compares equal");
 
     // Infinity
