@@ -16,6 +16,11 @@ source_files = [
 if GetOption('experimental-decimal-support') == 'on':
     lib_deps.append('$BUILD_DIR/third_party/shim_intel_decimal128')
     source_files.append('decimal128.cpp')
+    env.Append(CPPDEFINES={
+        'DECIMAL_CALL_BY_REFERENCE': '0',
+        'DECIMAL_GLOBAL_ROUNDING': '0',
+        'DECIMAL_GLOBAL_EXCEPTION_FLAGS': '0'
+    })
 else:
     source_files.append('decimal128_dummy.cpp')
 
